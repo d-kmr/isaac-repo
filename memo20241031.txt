@@ -1,0 +1,47 @@
+
+Z3 
+SMT-solver
+- uses several logics (switch by option)
+
+Logic
+- PA (Peano arithmetic): First-order logic+ axioms about Natural numbers
+0
+S(n) (n+1)
+m+n, m*n
+forall n.n>=0
+S(m)=S(n) -> m=n
+...
+induction principle: P(0) and forall n.P(n)->P(Sn) implies forall n.P(n)
+
+Undecidable for validity
+Input: closed formula of PA
+Check: is it valid?
+
+
+- Presburger Arithmetic: First-order logic+ axioms about Natural numbers "without multiplication"
+Only function symbol S
+Decidable for validity!  <- Algorithm to check validity 
+In Z3: "linear arithmetic"
+
+Keywords
+"Quantifier elimination in Presburger Arith."  (keypoint of the algorithm)
+∀x.∃y.P(x,y) --> ∀x.P(x,f(y))
+
+SLAC
+separation logic
+symbolic heaps (Π∧Σ)   x!=y ∧ x->(1)*y->(10)
+Π:pure part (presburger formulas+α)
+
+
+Z3
+- standalone (input:SMT-LIB form)
+- OCaml library
+  our syntax -(parse)-> our OCaml datastructure -(transform)-> internal SMT-LIB-data -(Z3)-> result (yes/no)
+
+Your job
+our syntax -(parse)-> our OCaml datastructure (symbolic heaps) -(transform)-> simplified formula
+(Π∧Σ)               (Π∧Σ)                                                 (Π'∧Σ')
+
+
+
+
