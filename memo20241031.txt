@@ -43,5 +43,29 @@ our syntax -(parse)-> our OCaml datastructure (symbolic heaps) -(transform)-> si
 (Π∧Σ)               (Π∧Σ)                                                 (Π'∧Σ')
 
 
+[OCaml compiling]
+ocamlc aaa.ml    --> a.out is created
+ocamlopt aaa.ml  --> a.out is created
+ocamlfind opt = ocamlopt
 
+ocamlopt -c aaa.ml  (aaa.cmx is created)
+ocamlopt -c bbb.ml  (bbb.cmx is created)
+ocamlopt aaa.cmx bbb.cmx ccc.ml
 
+C
+C++
+Java
+Python
+Prolog
+Haskell (based on recursive functions) monad
+OCaml (based on recursive functions) reference type (pointer)
+
+map (fun x->x+1) [1;2;3]  --> [2;3;4]
+fold_left
+fold_right
+
+let x: int ref = ref 0
+x := 1      
+print_int !x
+
+issac-repo/simplifier/tools/tools.ml
