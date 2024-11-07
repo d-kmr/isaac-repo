@@ -69,3 +69,13 @@ x := 1
 print_int !x
 
 issac-repo/simplifier/tools/tools.ml
+
+
+Proof assistant
+Coq (type theory)
+Theorem A: forall x.(...)
+Proof. introduce ....
+Lean (type theory)
+Agda (type theory)
+
+Terence Tao 
