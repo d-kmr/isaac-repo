@@ -16,6 +16,7 @@ induction principle: P(0) and forall n.P(n)->P(Sn) implies forall n.P(n)
 Undecidable for validity
 Input: closed formula of PA
 Check: is it valid?
+cuz of multiplication becomes intractable
 
 
 - Presburger Arithmetic: First-order logic+ axioms about Natural numbers "without multiplication"
