@@ -1,0 +1,200 @@
+// Syntax
+// (term)      t := <string>('@'<string>)* | '#'<string>'@'<string> | <int> | t '+' t | t '-' t | t '+-' t | t '*' t | t '%' <int> | <string>'(' t* ')'
+// (pure atom) p := t '=' t | t "<>" t | t '<' t | t "<=" t | t '>' t | t ">=" t | "True" | "False" | (P)
+// (pure)      P := p | P '&' P | P '&' P | P '|' P | "All" <string>(',' <string>)* P | "Ex" <string>(',' <string>)* P 
+// (fieldterm) f := t | <string> ':' t  
+// (spat atom) s := "Emp" | t "->" '(' f* ')' | "Arr" '(' t ',' t ')' | "Str" '(' t ',' t ')'
+// (spat)      S := s | S '*' S
+// (symb.heap) H := P "&&" S
+
+
+// Perhaps this is a better formula to see.
+// Sat checking around this area are taking 0.3 - 0.6 sec. and they are many.
+// If so many disjunctions is the reason, can you take some approach to speed up?
+// Perhaps you already have similar or better enhancement. But in case, here is one idea.
+// For example, (A | B) & (C | D) is typically supposed to be first expanded into (A & C) | (A & D) | (B & C) | (B & D) and then sending to z3.
+// But, if it is possible to send A & C to z3 first before constructing the rest of the disjuncts, then you can decide the formula to be sat if A & C is sat. 
+// I know in the worst-case scenario, it is the same as the typical case.
+
+
+// SMALLER EXAMPLE than eg07.sat
+// number of " | ": 68 (raw data)
+// number of " or ": 68 (after parsing)
+
+
+(t631964'@hat=/(#size@hat+t632164'@hat)) &
+(t631964'@hat=/(#size@hat+t631964'@hat)) &
+(t631964'@hat=/nids@chk) &
+(t631964'@hat=/t630991'@tilde) &
+((#size@hat+t632164'@hat)=/t632164'@hat) &
+((#size@hat+t632164'@hat)=/(#size@hat+t631964'@hat)) &
+((#size@hat+t632164'@hat)=/nids@chk) &
+((#size@hat+t632164'@hat)=/t630991'@tilde) &
+(t632164'@hat=/(#size@hat+t631964'@hat)) &
+(t632164'@hat=/nids@chk) &
+(t632164'@hat=/t630991'@tilde) &
+((#size@hat+t631964'@hat)=/nids@chk) &
+((#size@hat+t631964'@hat)=/t630991'@tilde) &
+(nids@chk=/t630991'@tilde) &
+((t631964'@hat<t631004'@tilde) | (t631004'@tilde<t631964'@hat)) &
+((t631964'@hat<t629369'@hat) | (t629369'@hat<t631964'@hat)) &
+((t631964'@hat<100) | (100<t631964'@hat)) &
+((t631964'@hat<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<t631964'@hat)) &
+(((#size@hat+t632164'@hat)<t631004'@tilde) | (t631004'@tilde<(#size@hat+t632164'@hat))) &
+(((#size@hat+t632164'@hat)<t629369'@hat) | (t629369'@hat<(#size@hat+t632164'@hat))) &
+(((#size@hat+t632164'@hat)<100) | (100<(#size@hat+t632164'@hat))) &
+(((#size@hat+t632164'@hat)<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<(#size@hat+t632164'@hat))) &
+((t632164'@hat<t631004'@tilde) | (t631004'@tilde<t632164'@hat)) &
+((t632164'@hat<t629369'@hat) | (t629369'@hat<t632164'@hat)) &
+((t632164'@hat<100) | (100<t632164'@hat)) &
+((t632164'@hat<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<t632164'@hat)) &
+(((#size@hat+t631964'@hat)<t631004'@tilde) | (t631004'@tilde<(#size@hat+t631964'@hat))) &
+(((#size@hat+t631964'@hat)<t629369'@hat) | (t629369'@hat<(#size@hat+t631964'@hat))) &
+(((#size@hat+t631964'@hat)<100) | (100<(#size@hat+t631964'@hat))) &
+(((#size@hat+t631964'@hat)<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<(#size@hat+t631964'@hat))) &
+((nids@chk<t631004'@tilde) | (t631004'@tilde<nids@chk)) &
+((nids@chk<t629369'@hat) | (t629369'@hat<nids@chk)) &
+((nids@chk<100) | (100<nids@chk)) &
+((nids@chk<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<nids@chk)) &
+((t630991'@tilde<t631004'@tilde) | (t631004'@tilde<t630991'@tilde)) &
+((t630991'@tilde<t629369'@hat) | (t629369'@hat<t630991'@tilde)) &
+((t630991'@tilde<100) | (100<t630991'@tilde)) &
+((t630991'@tilde<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<t630991'@tilde)) &
+((t631004'@tilde<t629369'@hat) | (t629369'@hat<t631004'@tilde)) &
+((t631004'@tilde<100) | (100<t631004'@tilde)) &
+((t631004'@tilde<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<t631004'@tilde)) &
+((t629369'@hat<100) | (100<t629369'@hat)) &
+((t629369'@hat<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<t629369'@hat)) &
+((100<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<100)) &
+(table@bar=/(t629361'@hat+26)) &
+(table@bar=/(t629362'@hat+26)) &
+(table@bar=/(t629363'@hat+26)) &
+(table@bar=/(t629364'@hat+26)) &
+(table@bar=/t629369'@hat) &
+(t629380'@tilde=0) &
+(t629392'@tilde=0) &
+(((#size@hat+t629393'@hat)<t629393'@hat) | (t629393'@hat<(#size@hat+t629393'@hat))) &
+((t629397'@hat<=(t629397'@hat+15)) & (((#size@hat+t629397'@hat)<t629397'@hat) | ((t629397'@hat+15)<(#size@hat+t629397'@hat)))) &
+(t629397'@hat=/0) &
+(t629390'@hat=0) &
+(t629391'@hat=0) &
+(t629393'@hat=/0) &
+(t629380'@tilde=t629392'@tilde) &
+(cleanup_stack@bar=/nil) &
+((t629444'@hat<=(t629444'@hat+23)) & (((t629445'@hat+24)<t629444'@hat) | ((t629444'@hat+23)<(t629445'@hat+24)))) &
+((t629445'@hat<=(t629445'@hat+23)) & (((t629444'@hat+24)<t629445'@hat) | ((t629445'@hat+23)<(t629444'@hat+24)))) &
+((t629444'@hat+24)=/(t629445'@hat+24)) &
+(t629455'@hat=/0) &
+(t629455'@hat=/nil) &
+((cleanup_stack@bar=0) | (t629450'@tilde=18446)) &
+((#size@hat+t629455'@hat)=/t629455'@hat) &
+((((#size@hat<=(#size@hat+t629455'@hat)) & ((#size@hat+t629455'@hat)<=t629455'@hat)) & (((#size@hat<=cleanup_stack@bar) & (cleanup_stack@bar<=t629455'@hat)) & (#size@hat<t629455'@hat))) | ((((#size@hat<t629455'@hat) & (t629455'@hat<=(#size@hat+t629455'@hat))) & (((#size@hat<=cleanup_stack@bar) & (cleanup_stack@bar<=(#size@hat+t629455'@hat))) & (#size@hat<=(#size@hat+t629455'@hat)))) | (((#size@hat<t629455'@hat) & (t629455'@hat<=cleanup_stack@bar)) & (((#size@hat<=(#size@hat+t629455'@hat)) & ((#size@hat+t629455'@hat)<=cleanup_stack@bar)) & (#size@hat<=cleanup_stack@bar))))) &
+(num_nids@chk=/0) &
+(num_nids@bar=/0) &
+(t629369'@hat=/nids@chk) &
+(table@bar=nids@chk) &
+(t630991'@tilde=/nids@chk) &
+(t630991'@tilde=/t629369'@hat) &
+(t629369'@hat=/t631004'@tilde) &
+(100=/t631004'@tilde) &
+(100=/t629369'@hat) &
+((t631034'@tilde<=(t631034'@tilde+(t631014'@tilde+-1))) & ((t631004'@tilde<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<t631004'@tilde))) &
+((t631034'@tilde<=(t631034'@tilde+(t631014'@tilde+-1))) & ((t629369'@hat<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<t629369'@hat))) &
+((t631034'@tilde<=(t631034'@tilde+(t631014'@tilde+-1))) & ((100<t631034'@tilde) | ((t631034'@tilde+(t631014'@tilde+-1))<100))) &
+(t631033'@tilde=0) &
+(t630991'@tilde<nids@chk) &
+(nids@chk<100) &
+(100<t631034'@tilde) &
+(t631034'@tilde=(t631034'@tilde+(t631014'@tilde+-1))) &
+((t631034'@tilde+(t631014'@tilde+-1))<t629369'@hat) &
+(t629369'@hat=(t631034'@tilde+t631014'@tilde)) &
+((t631034'@tilde+t631014'@tilde)<t631004'@tilde) &
+(t631964'@hat=/0) &
+(((#size@hat+t632164'@hat)<t632164'@hat) | (t632164'@hat<(#size@hat+t632164'@hat))) &
+(t632164'@hat=/0) &
+(table@bar=nids@chk) &
+(t632607'@bar=/(t639905'@hat+21)) &
+((t639905'@hat+21)<t639902'@tilde) &
+((t639900'@tilde+t639757'@tilde)<t632607'@bar) &
+(t632607'@bar=(t639900'@tilde+(t639757'@tilde+1))) &
+(t639759'@tilde=t639902'@tilde) &
+(t639760'@tilde=t639757'@tilde) &
+(t639762'@tilde=t639763'@tilde) &
+(t639764'@tilde=t639765'@tilde) &
+(t639766'@tilde=t639767'@tilde) &
+(t639768'@tilde=t639769'@tilde) &
+(t639770'@tilde=t639771'@tilde) &
+(t639772'@tilde=t639773'@tilde) &
+(t639774'@tilde=t639775'@tilde) &
+(t639776'@tilde=t639777'@tilde) &
+(t639778'@tilde=t639779'@tilde) &
+(t639780'@tilde=t639781'@tilde) &
+(t639782'@tilde=t639783'@tilde) &
+(t639784'@tilde=t639785'@tilde) &
+(t639786'@tilde=t639787'@tilde) &
+(t639788'@tilde=t639789'@tilde) &
+(t639790'@tilde=t639791'@tilde) &
+(t639792'@tilde=t639793'@tilde) &
+(0=t639794'@tilde) &
+(0<t639796'@tilde) &
+(t639898'@tilde=(t639898'@tilde+(t639799'@tilde+-1))) &
+((t639898'@tilde+(t639799'@tilde+-1))=t639905'@hat) &
+(t639905'@hat<(t639898'@tilde+t639799'@tilde)) &
+((t639898'@tilde+t639799'@tilde)<(t639905'@hat+20)) &
+((t639905'@hat+21)<t639902'@tilde) &
+(t639902'@tilde<t639900'@tilde) &
+(t639900'@tilde=(t639900'@tilde+t639757'@tilde)) &
+((t639900'@tilde+t639757'@tilde)=(t639902'@tilde+1)) &
+((t639902'@tilde+1)<t632607'@bar) &
+(t632607'@bar=(t639900'@tilde+(t639757'@tilde+1))) &
+((t639900'@tilde+(t639757'@tilde+1))<t631964'@hat) &
+(t631964'@hat<100) &
+(t639807'@tilde=t639898'@tilde) &
+(t639808'@tilde=t639809'@tilde) &
+(t639810'@tilde=t639811'@tilde) &
+(t639796'@tilde=t639813'@tilde) &
+(t639814'@tilde=t639815'@tilde) &
+(t639816'@tilde=t639817'@tilde) &
+(t639818'@tilde=t639799'@tilde) &
+(t639797'@tilde=t639821'@tilde) &
+(t639822'@tilde=t639823'@tilde) &
+(t639795'@tilde=t639825'@tilde) &
+(t639826'@tilde=t639827'@tilde) &
+(t639828'@tilde=t639829'@tilde) &
+(t639830'@tilde=t639831'@tilde) &
+(t639832'@tilde=t639833'@tilde) &
+(t639834'@tilde=t639835'@tilde) &
+(t639836'@tilde=t639837'@tilde) &
+(t639838'@tilde=t639839'@tilde) &
+(t639867'@tilde=0) &
+(t639870'@hat=/0) &
+(t632607'@bar=/(#size@hat+t639870'@hat)) &
+((t632607'@bar<t639870'@hat) | (t639870'@hat<t632607'@bar)) &
+((t632607'@bar<t631964'@hat) | (t631964'@hat<t632607'@bar)) &
+((t632607'@bar<100) | (100<t632607'@bar)) &
+((t632607'@bar<t639898'@tilde) | ((t639898'@tilde+(t639799'@tilde+-1))<t632607'@bar)) &
+((t632607'@bar<t639900'@tilde) | ((t639900'@tilde+t639757'@tilde)<t632607'@bar)) &
+((t632607'@bar<t639902'@tilde) | (t639902'@tilde<t632607'@bar)) &
+(((#size@hat+t639870'@hat)<t639870'@hat) | (t639870'@hat<(#size@hat+t639870'@hat))) &
+(((#size@hat+t639870'@hat)<t631964'@hat) | (t631964'@hat<(#size@hat+t639870'@hat))) &
+(((#size@hat+t639870'@hat)<100) | (100<(#size@hat+t639870'@hat))) &
+(((#size@hat+t639870'@hat)<t639898'@tilde) | ((t639898'@tilde+(t639799'@tilde+-1))<(#size@hat+t639870'@hat))) &
+(((#size@hat+t639870'@hat)<t639900'@tilde) | ((t639900'@tilde+t639757'@tilde)<(#size@hat+t639870'@hat))) &
+(((#size@hat+t639870'@hat)<t639902'@tilde) | (t639902'@tilde<(#size@hat+t639870'@hat))) &
+((t639870'@hat<t631964'@hat) | (t631964'@hat<t639870'@hat)) &
+((t639870'@hat<100) | (100<t639870'@hat)) &
+((t639870'@hat<t639898'@tilde) | ((t639898'@tilde+(t639799'@tilde+-1))<t639870'@hat)) &
+((t639870'@hat<t639900'@tilde) | ((t639900'@tilde+t639757'@tilde)<t639870'@hat)) &
+((t639870'@hat<t639902'@tilde) | (t639902'@tilde<t639870'@hat)) &
+((t631964'@hat<100) | (100<t631964'@hat)) &
+((t631964'@hat<t639898'@tilde) | ((t639898'@tilde+(t639799'@tilde+-1))<t631964'@hat)) &
+((t631964'@hat<t639900'@tilde) | ((t639900'@tilde+t639757'@tilde)<t631964'@hat)) &
+((t631964'@hat<t639902'@tilde) | (t639902'@tilde<t631964'@hat)) &
+((100<t639898'@tilde) | ((t639898'@tilde+(t639799'@tilde+-1))<100)) &
+((100<t639900'@tilde) | ((t639900'@tilde+t639757'@tilde)<100)) &
+((100<t639902'@tilde) | (t639902'@tilde<100)) &
+(((t639898'@tilde+(t639799'@tilde+-1))<t639900'@tilde) | ((t639900'@tilde+t639757'@tilde)<t639898'@tilde)) &
+(((t639898'@tilde+(t639799'@tilde+-1))<t639902'@tilde) | (t639902'@tilde<t639898'@tilde)) &
+(((t639900'@tilde+t639757'@tilde)<t639902'@tilde) | (t639902'@tilde<t639900'@tilde))
+&&
+Emp

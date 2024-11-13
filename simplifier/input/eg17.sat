@@ -1,0 +1,37 @@
+// Syntax
+// (term)      t := <string>('@'<string>)* | '#'<string>'@'<string> | <int> | t '+' t | t '-' t | t '+-' t | t '*' t | t '%' <int> | <string>'(' t* ')' | t 'band' t | t 'bor' t | t 'bxor' t | t '<<' t | t '>>' t
+// (pure atom) p := t '=' t | t "<>" t | t '<' t | t "<=" t | t '>' t | t ">=" t | "True" | "False" | (P)
+// (pure)      P := p | P 'AND' P | P 'OR' P | P '=>' P | 'NOT' P | "ALLint" <string>(',' <string>)* P | "EXint" <string>(',' <string>)* P | "ALLnat" <string>(',' <string>)* P | "EXnat" <string>(',' <string>)* P 
+// (fieldterm) f := t | <string> ':' t  
+// (spat atom) s := "Emp" | t "-> '(' f* ')' | "Arr" '(' t ',' t ')' | "Str" '(' t ',' t ')'
+// (spat)      S := s | S '*' S
+// (symb.heap) H := P "&&" S
+
+//b2 =
+(t12'@hat==t13'@act)
+& (t8'@hat==t9'@act)
+& (t4'@hat==t5'@act)
+& (t1'@hat==t2'@act)
+& (t2'@act!=0)
+& (t5'@act!=0)
+& (t2'@act==t1'@hat)
+& (t9'@act!=0)
+& (t5'@act==t4'@hat)
+& (t13'@act!=0)
+& (t9'@act==t8'@hat)
+& (t13'@act==t12'@hat)
+& (t2'@act==t12'@hat)
+//& ((t1'@hat<a@hat) || ((a@hat+20)<t1'@hat))
+//& ((#size@hat+t12'@hat)!=t1'@hat)
+//& ((#size@hat+t8'@hat)!=t1'@hat)
+//& (((#size@hat+t12'@hat)<a@hat) || ((a@hat+20)<(#size@hat+t12'@hat)))
+//& (((#size@hat+t8'@hat)<a@hat) || ((a@hat+20)<(#size@hat+t8'@hat)))
+//& ((t8'@hat<a@hat) || ((a@hat+20)<t8'@hat))
+//& ((t12'@hat<a@hat) || ((a@hat+20)<t12'@hat))
+//& ((#size@hat+t8'@hat)!=(#size@hat+t12'@hat))
+//& (t8'@hat!=(#size@hat+t12'@hat))
+//& (t8'@hat!=(#size@hat+t8'@hat))
+//& (t12'@hat!=(#size@hat+t12'@hat))
+//& (t12'@hat!=(#size@hat+t8'@hat))
+&& 
+Emp

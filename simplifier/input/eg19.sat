@@ -1,0 +1,28 @@
+// Syntax
+// (term)      t := <string>('@'<string>)* | '#'<string>'@'<string> | <int> | t '+' t | t '-' t | t '+-' t | t '*' t | t '%' <int> | <string>'(' t* ')' | t 'band' t | t 'bor' t | t 'bxor' t | t '<<' t | t '>>' t
+// (pure atom) p := t '=' t | t "<>" t | t '<' t | t "<=" t | t '>' t | t ">=" t | "True" | "False" | (P)
+// (pure)      P := p | P 'AND' P | P 'OR' P | P '=>' P | 'NOT' P | "ALLint" <string>(',' <string>)* P | "EXint" <string>(',' <string>)* P | "ALLnat" <string>(',' <string>)* P | "EXnat" <string>(',' <string>)* P 1
+// (fieldterm) f := t | <string> ':' t  
+// (spat atom) s := "Emp" | t "-> '(' f* ')' | "Arr" '(' t ',' t ')' | "Str" '(' t ',' t ')'
+// (spat)      S := s | S '*' S
+// (symb.heap) H := P "&&" S
+
+t72'@hat==t73'@act & t57'@hat==t58'@act & 0<(t58'@act+1) & 0<t58'@act & (t58'@act+1)!=nil & t58'@act!=nil & t58'@act!=(t58'@act+1) & t58'@act!=10000000002 & t58'@act!=10000000001 & t58'@act!=10000000000 & t58'@act==t57'@hat & t57'@hat==t58'@act & 0<(t58'@act+1) & 0<t58'@act & (t58'@act+1)!=0 & t58'@act!=0 & t58'@act!=(t58'@act+1) & t58'@act!=10000000002 & t58'@act!=10000000001 & t58'@act!=10000000000 & t58'@act==t57'@hat & 
+(
+    (t69'@tilde!=(t57'@hat+1) & t61'@tilde!=(t57'@hat+1) & t61'@tilde==t69'@tilde) | 
+    (t69'@tilde==(t57'@hat+1) & t61'@tilde==(t57'@hat+1) & t61'@tilde==t69'@tilde)) & 0<(t73'@act+1) & 0<t73'@act & 0<(t57'@hat+1) & 0<t57'@hat & 0<(t57'@hat+#size@hat) & (t73'@act+1)!=nil & t73'@act!=nil & (t57'@hat+1)!=nil & t57'@hat!=nil & (t57'@hat+#size@hat)!=nil & t73'@act!=(t73'@act+1) & (t57'@hat+1)!=(t73'@act+1) & (t57'@hat+1)!=t73'@act & t57'@hat!=(t73'@act+1) & t57'@hat!=t73'@act & t57'@hat!=(t57'@hat+1) & (t57'@hat+#size@hat)!=(t73'@act+1) & (t57'@hat+#size@hat)!=t73'@act & (t57'@hat+#size@hat)!=(t57'@hat+1) & (t57'@hat+#size@hat)!=t57'@hat & t73'@act!=10000000002 & t73'@act!=10000000001 & t73'@act!=10000000000 & t73'@act==t72'@hat & t72'@hat==t73'@act & 0<(t73'@act+1) & 0<t73'@act & (t73'@act+1)!=0 & t73'@act!=0 & (t57'@hat+1)!=0 & t57'@hat!=0 & (t57'@hat+#size@hat)!=0 & t73'@act!=(t73'@act+1) & (t57'@hat+1)!=(t73'@act+1) & (t57'@hat+1)!=t73'@act & t57'@hat!=(t73'@act+1) & t57'@hat!=t73'@act & (t57'@hat+#size@hat)!=(t73'@act+1) & (t57'@hat+#size@hat)!=t73'@act & t73'@act!=10000000002 & t73'@act!=10000000001 & t73'@act!=10000000000 & t73'@act==t72'@hat & 
+(
+    (t84'@tilde!=(t72'@hat+1) & t84'@tilde!=(t57'@hat+1) & t76'@tilde!=(t72'@hat+1) & t76'@tilde!=(t57'@hat+1) & t76'@tilde==t84'@tilde) | 
+    (t84'@tilde==(t72'@hat+1) & t84'@tilde!=(t57'@hat+1) & t76'@tilde==(t72'@hat+1) & t76'@tilde!=(t57'@hat+1) & t76'@tilde==t84'@tilde) | 
+    (t84'@tilde!=(t72'@hat+1) & t84'@tilde==(t57'@hat+1) & t76'@tilde!=(t72'@hat+1) & t76'@tilde==(t57'@hat+1) & t76'@tilde==t84'@tilde)) & t73'@act==t72'@hat & t58'@act==t57'@hat & (t72'@hat+1)!=(t57'@hat+1) & t11'@bar==(t57'@hat+1) & t11'@bar!=t95'@tilde & t95'@tilde!=(t57'@hat+1) & t95'@tilde==(t72'@hat+1) & t39'@bar!=(t72'@hat+1) & t40'@bar==t39'@bar & t11'@bar==(t57'@hat+1) & t11'@bar!=(t72'@hat+1) & t39'@bar!=(t72'@hat+1) & t40'@bar==t39'@bar & t11'@bar!=t113'@tilde & t11'@bar==t39'@bar & t113'@tilde!=t39'@bar & t113'@tilde!=(t57'@hat+1) & t113'@tilde==(t72'@hat+1) & t39'@bar==(t57'@hat+1) & 
+(
+    (t64'@tilde==t79'@tilde & t121'@tilde==2 & t57'@hat<t39'@bar & (t39'@bar+1)<t72'@hat & t72'@hat==t73'@act & t73'@act<(t72'@hat+1) & (t72'@hat+2)==(t121'@tilde+t73'@act)) | 
+    (t121'@tilde==2 & t57'@hat<t39'@bar & (t39'@bar+1)<t72'@hat & t72'@hat==t73'@act & t73'@act<(t72'@hat+1) & (t72'@hat+2)==(t121'@tilde+t73'@act) & 
+        ((t72'@hat+2)!=(t121'@tilde+t73'@act) | (t72'@hat+2)!=(t121'@tilde+t73'@act) | (t72'@hat+1)<=t73'@act | t72'@hat!=t73'@act | t72'@hat<=(t39'@bar+1) | t39'@bar<=t57'@hat | t121'@tilde!=2 | t64'@tilde!=t79'@tilde))) & 
+(
+    (t122'@tilde==2 & t57'@hat==t58'@act & t58'@act<t39'@bar & t39'@bar==(t122'@tilde+(t58'@act+(-1))) & (#size@hat+t58'@act)==(t39'@bar+1) & (t39'@bar+1)==(t122'@tilde+t58'@act)) | 
+    (t122'@tilde==2 & t57'@hat==t58'@act & t58'@act<t39'@bar & t39'@bar==(t122'@tilde+(t58'@act+(-1))) & (t122'@tilde+t58'@act)<(t39'@bar+2) & (t39'@bar+1)==(t122'@tilde+t58'@act) & 
+        ((t39'@bar+1)!=(t122'@tilde+t58'@act) | (#size@hat+t58'@act)!=(t39'@bar+1) | t39'@bar!=(t122'@tilde+(t58'@act+(-1))) | t39'@bar<=t58'@act | t57'@hat!=t58'@act | t122'@tilde!=2)))
+&& 
+Emp
+

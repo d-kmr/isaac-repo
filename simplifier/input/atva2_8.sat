@@ -1,0 +1,33 @@
+// Syntax
+// (term)      t := <string>('@'<string>)* | '#'<string>'@'<string> | <int> | t '+' t | t '-' t | t '+-' t | t '*' t | t '%' <int> | <string>'(' t* ')' | t 'band' t | t 'bor' t | t 'bxor' t | t '<<' t | t '>>' t
+// (pure atom) p := t '=' t | t "<>" t | t '<' t | t "<=" t | t '>' t | t ">=" t | "True" | "False" | (P)
+// (pure)      P := p | P 'AND' P | P 'OR' P | P '=>' P | 'NOT' P | "ALLint" <string>(',' <string>)* P | "EXint" <string>(',' <string>)* P | "ALLnat" <string>(',' <string>)* P | "EXnat" <string>(',' <string>)* P 
+// (fieldterm) f := t | <string> ':' t  
+// (spat atom) s := "Emp" | t "-> '(' f* ')' | "Arr" '(' t ',' t ')' | "Str" '(' t ',' t ')'
+// (spat)      S := s | S '*' S
+// (symb.heap) H := P "&&" S
+
+// Disjunct 8: (example-tatsuta/atva2)
+
+(t1'@hat!=t41'@tilde) 
+& ((t1'@hat==t42'@tilde) || ((t42'@tilde!=0) || ((t41'@tilde!=0) || ((t22'@bar!=0) || ((t1'@hat!=0) || ((t4'@hat!=0) || ((t8'@hat!=0) || ((t12'@hat!=0) || (t40'@bar==0))))))))) 
+& ((2+a@hat)<=(20+a@hat)) 
+& (t1'@hat!=t41'@tilde) 
+& ((t1'@hat==t42'@tilde) || ((t42'@tilde!=0) || ((t41'@tilde!=0) || ((t22'@bar!=0) || ((t1'@hat!=0) || ((t4'@hat!=0) || ((t8'@hat!=0) || ((t12'@hat!=0) || (t40'@bar==0))))))))) 
+& (0<(2+a@hat)) 
+& (t62'_F_mod@dotdot==0) 
+& (t61'_F_presb@dotdot!=0) 
+& ((t60'_Findependence@dotdot!=0) || (t59'_Fexact@dotdot!=0)) 
+& (t58'_F_lmax_infty@dotdot!=0)
+& (((t42'@tilde!=0) & ((t40'@bar!=0) & ((t40'@bar==t42'@tilde) & ((t1'@hat!=0) & ((t1'@hat!=t42'@tilde) & (t1'@hat!=t40'@bar)))))) || (((t42'@tilde!=0) & ((t40'@bar!=0) & ((t40'@bar!=t42'@tilde) & ((t1'@hat!=0) & ((t1'@hat!=t42'@tilde) & ((t1'@hat!=t40'@bar) & (((t42'@tilde!=0) || ((t40'@bar!=0) || ((t40'@bar!=t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))) & ((t42'@tilde==0) || ((t40'@bar==0) || ((t40'@bar!=t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar))))))))))))) || (((t42'@tilde==0) & ((t40'@bar!=0) & ((t40'@bar!=t42'@tilde) & ((t1'@hat!=0) & ((t1'@hat!=t42'@tilde) & ((t1'@hat!=t40'@bar) & (((t42'@tilde==0) || ((t40'@bar!=0) || ((t40'@bar==t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))) & (((t42'@tilde==0) || ((t40'@bar==0) || ((t40'@bar==t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))) & (((t42'@tilde!=0) || ((t40'@bar!=0) || ((t40'@bar!=t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))) & ((t42'@tilde==0) || ((t40'@bar==0) || ((t40'@bar!=t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar))))))))))))))) || (((t42'@tilde!=0) & ((t40'@bar==0) & ((t40'@bar!=t42'@tilde) & ((t1'@hat!=0) & ((t1'@hat!=t42'@tilde) & ((t1'@hat!=t40'@bar) & (((t42'@tilde==0) || ((t40'@bar==0) || ((t40'@bar==t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))) & (((t42'@tilde!=0) || ((t40'@bar!=0) || ((t40'@bar!=t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))) & ((t42'@tilde==0) || ((t40'@bar==0) || ((t40'@bar!=t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))))))))))) || ((t42'@tilde==0) & ((t40'@bar==0) & ((t40'@bar==t42'@tilde) & ((t1'@hat!=0) & ((t1'@hat!=t42'@tilde) & ((t1'@hat!=t40'@bar) & ((t42'@tilde==0) || ((t40'@bar==0) || ((t40'@bar!=t42'@tilde) || ((t1'@hat==0) || ((t1'@hat==t42'@tilde) || (t1'@hat==t40'@bar)))))))))))))))) 
+& ((a@hat+20)==(20+a@hat)) 
+& ((20+a@hat)<(a@hat+21)) 
+& ((2+a@hat)<(a@hat+20)) 
+& (a@hat<(2+a@hat))
+&&
+t1'@hat->(next:t40'@bar) 
+* (#size@hat+t1'@hat)->(*:8) 
+* List (t40'@bar, t42'@tilde)
+* List (t42'@tilde, 0) 
+* Array (a@hat, ((2+a@hat)-1)) 
+* Array ((2+a@hat), (20+a@hat))
