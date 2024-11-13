@@ -1,4 +1,5 @@
 // Parser for Satcheck 2019/10/03
+// - 2020/01/09: supporting lists and Faisal's attriv
 
 %{
 open Slsyntax
@@ -69,7 +70,7 @@ open Tools
                                     
 %token EOF 
 
-// Assoc priority
+// 結合力(優先度が低い順)
 %nonassoc VDASH
 %nonassoc ANDAND                                    
 %nonassoc EXint EXnat ALLint ALLnat

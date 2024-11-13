@@ -903,8 +903,8 @@ module SHpure = struct
     | False -> Format.fprintf fmt "%s" "False"
     | Atom(Eq,[t0;t1]) -> Format.fprintf fmt "%a=%a" T.pp t0 T.pp t1
     | Atom(Eq,tt) -> Format.fprintf fmt "(= %a)" (pp_list "ERROR" " " T.pp) tt
-    | Atom(Neq,[t0;t1]) -> Format.fprintf fmt "%a=/%a" T.pp t0 T.pp t1
-    | Atom(Neq,tt) -> Format.fprintf fmt "(=/ %a)" (pp_list "ERROR" " " T.pp) tt
+    | Atom(Neq,[t0;t1]) -> Format.fprintf fmt "%a<>%a" T.pp t0 T.pp t1
+    | Atom(Neq,tt) -> Format.fprintf fmt "(<> %a)" (pp_list "ERROR" " " T.pp) tt
     | Atom(Lt,tt) -> pp_list "ERROR" "<" T.pp fmt tt
     | Atom(Le,tt) -> pp_list "ERROR" "<=" T.pp fmt tt
     | Atom(In,[t0;t1;t2]) -> Format.fprintf fmt "%a in [%a,%a]" T.pp t0 T.pp t1 T.pp t2

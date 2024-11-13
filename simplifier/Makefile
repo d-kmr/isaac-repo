@@ -1,46 +1,39 @@
-MAKEFILEPATH=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-SLACPATH=$(shell dirname ${MAKEFILEPATH})
+THISDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-THISDIR=satcheck
-THISPATH=$(SLACPATH)/$(THISDIR)
-THISNAME=satcheck
-THISML=$(addsuffix .ml,$(THISNAME))
-THISCMX=$(addsuffix .cmx,$(THISNAME))
-
-PARSER=satcheck_parser
-LEXER=satcheck_lexer
+PARSER=simplifier_parser
+LEXER=simplifier_lexer
 
 TOOLSDIR=tools
-TOOLSPATH=$(SLACPATH)/$(TOOLSDIR)
+TOOLSPATH=$(THISDIR)$(TOOLSDIR)
 TOOLSNAME=notations printTools tools ftools
 TOOLSML=$(addsuffix .ml,$(TOOLSNAME))
 TOOLSCMX=$(addsuffix .cmx,$(TOOLSNAME))
 
 SLLANGDIR=sllang
-SLLANGPATH=$(SLACPATH)/$(SLLANGDIR)
+SLLANGPATH=$(THISDIR)$(SLLANGDIR)
 SLLANGNAME=slsyntax
 SLLANGML=$(addsuffix .ml,$(SLLANGNAME))
 SLLANGCMX=$(addsuffix .cmx,$(SLLANGNAME))
 
 SMTDIR=smtlang
-SMTPATH=$(SLACPATH)/$(SMTDIR)
+SMTPATH=$(THISDIR)$(SMTDIR)
 SMTNAME=smtsyntax smttoz3 sltosmt 
 SMTML=$(addsuffix .ml,$(SMTNAME))
 SMTCMX=$(addsuffix .cmx,$(SMTNAME))
 
 PKGS=-package z3,ANSITerminal -thread
 
-INCLUDES=-I $(SLACPATH) -I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH)
+INCLUDES=-I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH)
 
-vpath %.ml $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(SLACPATH)
-vpath %.cmx $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(SLACPATH)
+vpath %.ml $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH)
+vpath %.cmx $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH)
 vpath %.mll $(SLLANGPATH)
 vpath %.mly $(SLLANGPATH)
 
-MAIN=satcheck_main.ml
-TARGET=satcheck
+MAIN=simplifier_main.ml
+TARGET=simplifier
 
-$(TARGET): $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(THISCMX) $(MAIN)
+$(TARGET): $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(MAIN)
 	ocamllex $(LEXER).mll
 	ocamlyacc $(PARSER).mly
 	@FILES="$(PARSER).mli $(LEXER).ml $(PARSER).ml";\
@@ -50,7 +43,8 @@ $(TARGET): $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(THISCMX) $(MAIN)
 	done
 	@echo "Compiling $(MAIN)"
 	@ocamlfind opt -o $(TARGET) $(PKGS) -linkpkg $(INCLUDES)\
-		$(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(THISCMX) $(PARSER).cmx $(LEXER).cmx\
+		$(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(THISCMX) $(PARSER).cmx $(LEXER).cmx \
+		simplifier.ml \
 		$(MAIN)
 	@echo "--> $(TARGET) is produced"
 
@@ -74,7 +68,7 @@ $(THISCMX): $(THISML)
 clean:
 	@echo "Removing $(PARSER).ml and $(LEXER).ml"
 	@rm -f $(PARSER).ml $(LEXER).ml
-	@DIRS="$(SLACPATH) $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(SATPATH) $(THISPATH)";\
+	@DIRS="$(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(THISDIR)";\
 	for DIR in $$DIRS; do\
 		echo "Cleaning $$DIR";\
 		cd $$DIR;\

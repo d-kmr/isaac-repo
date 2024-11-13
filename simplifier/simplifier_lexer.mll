@@ -1,9 +1,7 @@
 (* Lexer for slsyntax 2019/05/11 *)
-(* Modified 2019/08/05 for biabduction extention *)
-(* Modified 2021/05/30 to add binary operations *)
 
 {
-  open Satcheck_parser
+  open Simplifier_parser
 }
 
 let space = [' ' '\t']
