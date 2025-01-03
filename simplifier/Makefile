@@ -27,7 +27,7 @@ WDGNAME=wdg
 WDGML=$(addsuffix .ml,$(WDGNAME))
 WDGCMX=$(addsuffix .cmx,$(WDGNAME))
 
-PKGS=-package z3,ANSITerminal -thread
+PKGS=-package z3,ANSITerminal,ocamlgraph -thread
 
 INCLUDES=-I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH) -I $(WDGPATH)
 
@@ -73,6 +73,11 @@ $(WDGCMX): $(WDGML)
 $(THISCMX): $(THISML)
 	@echo "Compiling $(THISDIR)/$(basename $@).ml"
 	@cd $(THISPATH); ocamlfind opt $(INCLUDES) $(PKGS) -thread -c $(basename $@).ml
+
+deps:
+	opam install z3
+	opam install ANSITerminal
+	opam install ocamlgraph
 
 .PHONY: clean fresh
 clean:
