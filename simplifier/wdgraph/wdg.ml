@@ -39,10 +39,9 @@ module WDGraph = struct
   let traverse_edges (g : t) : (int * int * int) list =
     G.fold_edges_e (fun (u, w, v) acc -> (u, v, w) :: acc) g.graph []
 
-  (* Check if a new edge forms a cycle involving a red edge *)
+  (* Check if any of the red edges forms a cycle *)
   let forms_cycle_with_red (g : t) : bool =
     List.exists (fun (u, v) ->
-        (* Check if there is a path from v to u in the current graph *)
         let module Path = Path.Check(G) in
         let pc = Path.create(g.graph) in
         Path.check_path pc v u
