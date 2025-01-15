@@ -31,7 +31,7 @@ let rec push_negations (p: SHpure.t) : SHpure.t =
   | True -> p
   | False -> p
   | Atom _ -> p
-  | Neg (Atom _ as l) -> Neg l
+  | Neg (Atom _ as l) -> SHpure.dual l
   | Neg (Neg f) -> push_negations f  (* Double negation elimination *)
   | Neg (And clauses) ->
       Or (List.map (fun f -> push_negations (Neg f)) clauses)  (* De Morgan's *)
