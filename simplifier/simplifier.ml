@@ -59,12 +59,40 @@ let rec distribute (p: SHpure.t) : SHpure.t=
   | _ -> p
 
 
+(* Normalize associativity for And and Or nodes *)
+let rec normalize_associativity (p: SHpure.t) : SHpure.t =
+  match p with
+  | And clauses ->
+      let flattened = 
+        clauses
+        |> List.map normalize_associativity  (* Recursively normalize clauses *)
+        |> List.fold_left (fun acc clause ->
+            match clause with
+            | SHpure.And inner_clauses -> acc @ inner_clauses  (* Flatten nested AND *)
+            | _ -> acc @ [clause]) []
+      in
+      And flattened
+  | Or clauses ->
+      let flattened = 
+        clauses
+        |> List.map normalize_associativity  (* Recursively normalize clauses *)
+        |> List.fold_left (fun acc clause ->
+            match clause with
+            | SHpure.Or inner_clauses -> acc @ inner_clauses  (* Flatten nested OR *)
+            | _ -> acc @ [clause]) []
+      in
+      Or flattened
+  | Neg f -> Neg (normalize_associativity f)  (* Normalize within negation *)
+  | _ -> p  (* Atoms, True, False are already normalized *)
+
+
 (* Convert arbitrary formula to DNF *)
 let to_dnf (p: SHpure.t) : SHpure.t =
   p
   |> remove_implications     (* Remove implications *)
   |> push_negations          (* Push negations inward *)
   |> distribute              (* Apply distributive law *)
+  |> normalize_associativity (* Normalize associativity for And/Or nodes *)
  
 
 (* Currently do nothing *)
