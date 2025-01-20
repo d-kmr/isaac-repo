@@ -89,13 +89,13 @@ let rec normalize_associativity (p: SHpure.t) : SHpure.t =
 (* Convert arbitrary formula to DNF *)
 let to_dnf (p: SHpure.t) : SHpure.t =
   p
-  |> SHpure.unfold_indirect      (* Replace indirect references *)
+  (*|> SHpure.unfold_indirect      (* Replace indirect references *)*)
   |> remove_implications         (* Remove implications and biconditionals *)
   |> push_negations              (* Push negations inward using dual *)
   |> distribute                  (* Apply distributive law for DNF *)
   |> normalize_associativity     (* Normalize associativity of And/Or *)
-  |> SHpure.syntactical_simplL   (* Simplify resulting formula *)
-  |> SHpure.extinguish_phantoms  (* Remove phantom variables *)
+  (*|> SHpure.syntactical_simplL   (* Simplify resulting formula *)
+  |> SHpure.extinguish_phantoms  (* Remove phantom variables *)*)
  
 
 (* Currently do nothing *)
