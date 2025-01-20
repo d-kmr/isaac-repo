@@ -26,14 +26,37 @@ module WDGraph = struct
     red_edges = [];
   }
 
-  (* Add an edge to the graph *)
+  (* Add an edge to the graph with the new functionality *)
   let add_edge (g : t) (u : int) (v : int) (w : int) : unit =
-    (* Add vertices if they don't exist and add the edge *)
-    let g' = G.add_vertex (G.add_vertex g.graph u) v in
-    let g' = G.add_edge_e g' (u, w, v) in
-    g.graph <- g';
-    (* Add to red_edges if the weight is 0 *)
-    if w = 0 then g.red_edges <- (u, v) :: g.red_edges
+    (* Check if both nodes exist in the variable_mapping *)
+    if G.mem_vertex g.graph u && G.mem_vertex g.graph v then begin
+      (* Check if there is an existing edge between u and v *)
+      try
+        let edge = G.find_edge g.graph u v in
+        match edge with
+        | (_,w',_) ->
+          if w <> w' then
+            (* Update the weight to 0 if the weights differ *)
+            let g' = G.remove_edge_e g.graph (u, w', v) in
+            let g' = G.add_edge_e g' (u, 0, v) in
+            g.graph <- g';
+            g.red_edges <- (u, v) :: g.red_edges
+          else
+            (* Edge exists with the same weight, do nothing *)
+            ()
+      with Not_found ->
+        (* If no edge exists, simply add it *)
+        let g' = G.add_edge_e g.graph (u, w, v) in
+        g.graph <- g';
+        if w = 0 then g.red_edges <- (u, v) :: g.red_edges
+      end
+    else
+      (* Add the nodes if they don't exist *)
+      let g' = G.add_vertex (G.add_vertex g.graph u) v in
+      let g' = G.add_edge_e g' (u, w, v) in
+      g.graph <- g';
+      (* Add to red_edges if the weight is 0 *)
+      if w = 0 then g.red_edges <- (u, v) :: g.red_edges
 
   (* Traverse all edges and return a list of (source, target, weight) *)
   let traverse_edges (g : t) : (int * int * int) list =
