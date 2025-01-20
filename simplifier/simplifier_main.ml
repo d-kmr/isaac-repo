@@ -91,7 +91,7 @@ let () =
   (* Traverse edges *)
   let edges = WDGraph.traverse_edges g in
   List.iter (fun (u, v, w) ->
-      Printf.printf "Edge: %d -> %d (Weight: %d)\n" u v w
+      Printf.printf "Edge: %d -> %d (Weight: %d)\n"  u v w
     ) edges;
   
   let red_cycle = WDGraph.forms_cycle_with_red g in

@@ -31,7 +31,7 @@ let rec push_negations (p: SHpure.t) : SHpure.t =
   | True -> p
   | False -> p
   | Atom _ -> p
-  | Neg (Atom _ as l) -> Neg l
+  | Neg (Atom _ as l) -> SHpure.dual l
   | Neg (Neg f) -> push_negations f  (* Double negation elimination *)
   | Neg (And clauses) ->
       Or (List.map (fun f -> push_negations (Neg f)) clauses)  (* De Morgan's *)
@@ -59,12 +59,43 @@ let rec distribute (p: SHpure.t) : SHpure.t=
   | _ -> p
 
 
+(* Normalize associativity for And and Or nodes *)
+let rec normalize_associativity (p: SHpure.t) : SHpure.t =
+  match p with
+  | And clauses ->
+      let flattened = 
+        clauses
+        |> List.map normalize_associativity  (* Recursively normalize clauses *)
+        |> List.fold_left (fun acc clause ->
+            match clause with
+            | SHpure.And inner_clauses -> acc @ inner_clauses  (* Flatten nested AND *)
+            | _ -> acc @ [clause]) []
+      in
+      And flattened
+  | Or clauses ->
+      let flattened = 
+        clauses
+        |> List.map normalize_associativity  (* Recursively normalize clauses *)
+        |> List.fold_left (fun acc clause ->
+            match clause with
+            | SHpure.Or inner_clauses -> acc @ inner_clauses  (* Flatten nested OR *)
+            | _ -> acc @ [clause]) []
+      in
+      Or flattened
+  | Neg f -> Neg (normalize_associativity f)  (* Normalize within negation *)
+  | _ -> p  (* Atoms, True, False are already normalized *)
+
+
 (* Convert arbitrary formula to DNF *)
 let to_dnf (p: SHpure.t) : SHpure.t =
   p
-  |> remove_implications     (* Remove implications *)
-  |> push_negations          (* Push negations inward *)
-  |> distribute              (* Apply distributive law *)
+  |> SHpure.unfold_indirect      (* Replace indirect references *)
+  |> remove_implications         (* Remove implications and biconditionals *)
+  |> push_negations              (* Push negations inward using dual *)
+  |> distribute                  (* Apply distributive law for DNF *)
+  |> normalize_associativity     (* Normalize associativity of And/Or *)
+  |> SHpure.syntactical_simplL   (* Simplify resulting formula *)
+  |> SHpure.extinguish_phantoms  (* Remove phantom variables *)
  
 
 (* Currently do nothing *)
