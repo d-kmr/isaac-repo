@@ -44,7 +44,7 @@ rule token = parse
   | "~"       { TILDE }
   | "disj"    { DISJ }
   | "comm"    { COMM }
-  | "out"     { OUT }
+  | "Out"     { OUT }
   | "nil"     { NIL }
     
   | "EXint"   { EXint }

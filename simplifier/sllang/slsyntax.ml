@@ -907,9 +907,9 @@ module SHpure = struct
     | Atom(Neq,tt) -> Format.fprintf fmt "(<> %a)" (pp_list "ERROR" " " T.pp) tt
     | Atom(Lt,tt) -> pp_list "ERROR" "<" T.pp fmt tt
     | Atom(Le,tt) -> pp_list "ERROR" "<=" T.pp fmt tt
-    | Atom(In,[t0;t1;t2]) -> Format.fprintf fmt "%a in [%a,%a]" T.pp t0 T.pp t1 T.pp t2
+    | Atom(In,[t0;t1;t2]) -> Format.fprintf fmt "In(%a,%a,%a)" T.pp t0 T.pp t1 T.pp t2
     | Atom(In,_) -> raiseError "P.pp: Invalid arguments of In"
-    | Atom(Out,[t0;t1;t2]) -> Format.fprintf fmt "%a out [%a,%a]" T.pp t0 T.pp t1 T.pp t2
+    | Atom(Out,[t0;t1;t2]) -> Format.fprintf fmt "Out(%a,%a,%a)" T.pp t0 T.pp t1 T.pp t2
     | Atom(Out,_) -> raiseError "P.pp: Invalid arguments of Out"
     | Atom(Disj,[t0;t1;t2;t3]) -> Format.fprintf fmt "[%a,%a] disj [%a,%a]" T.pp t0 T.pp t1 T.pp t2 T.pp t3
     | Atom(Disj,_) -> raiseError "P.pp: Invalid arguments of Disj"

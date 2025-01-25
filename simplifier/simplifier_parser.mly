@@ -365,10 +365,9 @@ pure_atom:
         let (t2,t3) = $3 in
         P.Atom(Comm,[t0;t1;t2;t3])
       }
-  | term OUT term_interval
+  | OUT LPAREN term COMMA term COMMA term RPAREN
       {
-        let (t1,t2) = $3 in
-        P.Atom(Out,[$1;t1;t2])
+        P.Atom(Out,[$3;$5;$7])
       }
   | LPAREN pure RPAREN
       { $2 }
