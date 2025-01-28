@@ -84,9 +84,12 @@ let () =
 
   (* Dynamically add edges (nodes are automatically added) *)
   let _ = WDGraph.add_edge g 0 1 1 in
+  let _ = WDGraph.add_edge g 0 1 1 in
   let _ = WDGraph.add_edge g 2 2 0 in
   let _ = WDGraph.add_edge g 2 3 1 in
+  let _ = WDGraph.add_edge g 2 3 0 in
   let _ = WDGraph.add_edge g 3 0 2 in
+  let _ = WDGraph.add_edge g 3 0 1 in
 
   (* Traverse edges *)
   let edges = WDGraph.traverse_edges g in
