@@ -20,7 +20,7 @@ open Tools
 %token EQA       // '='
 %token EQB       // "=="                                    
 %token NEQA      // "<>"
-%token NEQB      // "=/"
+%token NEQB      // "!="
 %token NEQC      // "<>"
 %token SHL      // "<<"
 %token SHR      // ">>"
