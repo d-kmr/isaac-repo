@@ -21,25 +21,19 @@ SMTNAME=smtsyntax smttoz3 sltosmt
 SMTML=$(addsuffix .ml,$(SMTNAME))
 SMTCMX=$(addsuffix .cmx,$(SMTNAME))
 
-WDGDIR=wdgraph
-WDGPATH=$(THISDIR)$(WDGDIR)
-WDGNAME=wdg
-WDGML=$(addsuffix .ml,$(WDGNAME))
-WDGCMX=$(addsuffix .cmx,$(WDGNAME))
+PKGS=-package z3,ANSITerminal -thread
 
-PKGS=-package z3,ANSITerminal,ocamlgraph -thread
+INCLUDES=-I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH)
 
-INCLUDES=-I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH) -I $(WDGPATH)
-
-vpath %.ml $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(WDGPATH)
-vpath %.cmx $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(WDGPATH)
+vpath %.ml $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH)
+vpath %.cmx $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH)
 vpath %.mll $(SLLANGPATH)
 vpath %.mly $(SLLANGPATH)
 
 MAIN=simplifier_main.ml
 TARGET=simplifier
 
-$(TARGET): $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(WDGCMX) $(MAIN)
+$(TARGET): $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(MAIN)
 	ocamllex $(LEXER).mll
 	ocamlyacc $(PARSER).mly
 	@FILES="$(PARSER).mli $(LEXER).ml $(PARSER).ml";\
@@ -49,7 +43,7 @@ $(TARGET): $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(WDGCMX) $(MAIN)
 	done
 	@echo "Compiling $(MAIN)"
 	@ocamlfind opt -o $(TARGET) $(PKGS) -linkpkg $(INCLUDES)\
-		$(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(WDGCMX) $(THISCMX) $(PARSER).cmx $(LEXER).cmx \
+		$(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(THISCMX) $(PARSER).cmx $(LEXER).cmx \
 		simplifier.ml \
 		$(MAIN)
 	@echo "--> $(TARGET) is produced"
@@ -66,24 +60,15 @@ $(SMTCMX): $(SMTML)
 	@echo "Compiling $(SMTDIR)/$(basename $@).ml"
 	@cd $(SMTPATH); ocamlfind opt $(INCLUDES) $(PKGS) -thread -c $(basename $@).ml
 
-$(WDGCMX): $(WDGML)
-	@echo "Compiling $(WDGDIR)/$(basename $@).ml"
-	@cd $(WDGPATH); ocamlfind opt $(INCLUDES) $(PKGS) -thread -c $(basename $@).ml
-
 $(THISCMX): $(THISML)
 	@echo "Compiling $(THISDIR)/$(basename $@).ml"
 	@cd $(THISPATH); ocamlfind opt $(INCLUDES) $(PKGS) -thread -c $(basename $@).ml
-
-deps:
-	opam install z3
-	opam install ANSITerminal
-	opam install ocamlgraph
 
 .PHONY: clean fresh
 clean:
 	@echo "Removing $(PARSER).ml and $(LEXER).ml"
 	@rm -f $(PARSER).ml $(LEXER).ml
-	@DIRS="$(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(WDGPATH) $(THISDIR)";\
+	@DIRS="$(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(THISDIR)";\
 	for DIR in $$DIRS; do\
 		echo "Cleaning $$DIR";\
 		cd $$DIR;\
