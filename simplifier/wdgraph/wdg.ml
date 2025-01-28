@@ -1,4 +1,5 @@
 open Graph
+open Slsyntax
 
 (* Define the graph module using OCamlgraph's Persistent.Digraph.ConcreteLabeled functor *)
 module WDGraph = struct
@@ -69,5 +70,10 @@ module WDGraph = struct
         let pc = Path.create(g.graph) in
         Path.check_path pc v u
       ) g.red_edges
+  
+  (*Place holders, maye all the pre and post should be in another module so this class/module doesnt have to import Slsyntax*)
+  let add_conjunctions (g : t) (conjunctions) : unit = Printf.printf "Entering `add_conjunctions`.\n"
+  let simplify (g : t) : unit = Printf.printf "Entering `simplify`.\n"
+  let get_conjunctions (g : t) : Slsyntax.SHpure.t list = Printf.printf "Entering `get_conjunctions`.\n"; [True]
 end
 

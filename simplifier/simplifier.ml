@@ -2,6 +2,7 @@
   Simplifier of Symbolic Heaps
 *)
 open Slsyntax
+open Wdg
 
 (* 
 Currently the pure formullae follows the following grammar (Quantifier free formulae):
@@ -96,11 +97,25 @@ let to_dnf (p: SHpure.t) : SHpure.t =
   |> normalize_associativity     (* Normalize associativity of And/Or *)
   (*|> SHpure.syntactical_simplL   (* Simplify resulting formula *)
   |> SHpure.extinguish_phantoms  (* Remove phantom variables *)*)
- 
+
+let process_conjunctions (p : SHpure.t) : SHpure.t =
+  match p with
+  | And conjunctions ->
+      let g = WDGraph.create () in
+      let _ = WDGraph.add_conjunctions g conjunctions in 
+      let _ = WDGraph.simplify g in 
+      let simplified_conjunctions = WDGraph.get_conjunctions g in 
+      And simplified_conjunctions
+  | _ ->
+      failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
+
 
 (* Currently do nothing *)
-let simplify_pure (p: SHpure.t) : SHpure.t = to_dnf p
-
-
+let simplify_pure (p : SHpure.t) : SHpure.t =
+  let dnf_p = to_dnf p in
+  match dnf_p with
+  | Or clauses -> Or (List.map process_conjunctions clauses)
+  | And _ -> process_conjunctions dnf_p
+  | _ -> dnf_p
   
 ;;
