@@ -37,6 +37,7 @@ let _modelflag = ref false;;
 let _ucflag = ref false;;
 let _bnflag = ref false;;
 let _timeout = ref None;;
+let _stats= ref false;;
 let f_help () = print_endline "help";;
 let set_filename fname = _fname := fname;;
 let set_raw () = _rawflag := true;;
@@ -44,9 +45,10 @@ let set_model () = _modelflag := true;;
 let set_unsatcore () = _ucflag := true;;
 let set_foption opt = p_opt := opt :: !p_opt;;
 let set_timeout sec = _timeout := Some sec;;
+let set_stats () = _stats := true;;
   
 let msgUsage =
-"USAGE: simplifier [-d <TAG>|-b|-0|-t] -f <filename>";;
+"USAGE: simplifier [-d <TAG>|-b|-0|-t|-s] -f <filename>";;
 
 let speclist = [
     ("-f", Arg.String set_filename, "Input file (mandatory)");
@@ -57,6 +59,7 @@ let speclist = [
       MD: produce & show a model when an input is sat");
     ("-0", Arg.Unit set_raw, "Use raw z3 (Only checking the pure-part with Z3 ignoring the spat-part)");
     ("-t", Arg.Int set_timeout, "Set timeout [sec] (default:4294967295)");
+    ("-s", Arg.Unit set_stats, "Reports execution stats (execution time for now)");
   ];;
 
 (* parser *)
@@ -79,7 +82,7 @@ let () =
   Fmt.printf "@[[Spatial-formula]@.";
   Fmt.printf "@[%a@." SS.pp ss;
 
-  let p' = Simplifier.simplify_pure p in 
+  let p' = Simplifier.simplify_pure p !_stats in 
     
   Fmt.printf "@[[Simplified Pure-formula]@.";
   Fmt.printf "@[%a@." P.pp p';
