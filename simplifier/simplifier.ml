@@ -102,9 +102,25 @@ let process_conjunctions (p : SHpure.t) : SHpure.t =
   match p with
   | And conjunctions ->
       let g = WDGraph.create () in
+
+      let start_time_build = Unix.gettimeofday () in
       let _ = WDGraph.add_conjunctions g conjunctions in 
+      let end_time_build = Unix.gettimeofday () in
+      let elapsed_time_build = end_time_build -. start_time_build in
+      Printf.printf "Execution time build graph: %f seconds\n" elapsed_time_build;
+
+      let start_time_simplify = Unix.gettimeofday () in
       let _ = WDGraph.simplify g in 
+      let end_time_simplify = Unix.gettimeofday () in
+      let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
+      Printf.printf "Execution time simplify graph: %f seconds\n" elapsed_time_simplify;
+
+      let start_time_rebuild = Unix.gettimeofday () in
       let simplified_conjunctions = WDGraph.get_conjunctions g in 
+      let end_time_rebuild = Unix.gettimeofday () in
+      let elapsed_time_rebuild = end_time_rebuild -. start_time_rebuild in
+      Printf.printf "Execution time re-build graph: %f seconds\n" elapsed_time_rebuild;
+
       And simplified_conjunctions
   | _ ->
       failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
@@ -112,7 +128,11 @@ let process_conjunctions (p : SHpure.t) : SHpure.t =
 
 (* Currently do nothing *)
 let simplify_pure (p : SHpure.t) : SHpure.t =
+  let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
+  let end_time_dnf = Unix.gettimeofday () in
+  let elapsed_time_dnf = end_time_dnf -. start_time_dnf in
+  Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
   match dnf_p with
   | Or clauses -> Or (List.map process_conjunctions clauses)
   | And _ -> process_conjunctions dnf_p

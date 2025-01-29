@@ -69,7 +69,11 @@ let () =
   Arg.parse speclist print_endline msgUsage;
   let check_fname () = if !_fname = "" then (display_message (); exit 0) else () in
   check_fname();
+  let start_time_parse = Unix.gettimeofday () in
   let (p,ss) = parse (inputstr_file !_fname) in
+  let end_time_parse = Unix.gettimeofday () in
+  let elapsed_time_parse = end_time_parse -. start_time_parse in
+  Printf.printf "Execution time: %f seconds\n" elapsed_time_parse;
   Fmt.printf "@[[Pure-formula]@.";
   Fmt.printf "@[%a@." P.pp p;  
   Fmt.printf "@[[Spatial-formula]@.";
@@ -83,17 +87,17 @@ let () =
   let g = WDGraph.create () in
 
   (* Dynamically add edges (nodes are automatically added) *)
-  let _ = WDGraph.add_edge g 0 1 1 in
-  let _ = WDGraph.add_edge g 0 1 1 in
-  let _ = WDGraph.add_edge g 2 2 0 in
-  let _ = WDGraph.add_edge g 2 3 1 in
-  let _ = WDGraph.add_edge g 2 3 0 in
-  let _ = WDGraph.add_edge g 3 0 2 in
-  let _ = WDGraph.add_edge g 3 0 1 in
+  let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 0) (Slsyntax.SHterm.Int 1) 1 in
+  let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 0) (Slsyntax.SHterm.Int 1) 1 in
+  let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 2) (Slsyntax.SHterm.Int 2) 0 in
+  let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 2) (Slsyntax.SHterm.Int 3) 1 in
+  let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 2) (Slsyntax.SHterm.Int 3) 0 in
+  let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 3) (Slsyntax.SHterm.Int 0) 2 in
+  let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 3) (Slsyntax.SHterm.Int 0) 1 in
 
   (* Traverse edges *)
   let edges = WDGraph.traverse_edges g in
-  List.iter (fun (u, v, w) ->
+  List.iter (fun (Slsyntax.SHterm.Int u, Slsyntax.SHterm.Int v, w) ->
       Printf.printf "Edge: %d -> %d (Weight: %d)\n"  u v w
     ) edges;
   
