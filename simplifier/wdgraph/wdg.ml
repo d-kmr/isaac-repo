@@ -20,6 +20,7 @@ module WDGraph = struct
     mutable graph : G.t;                  (* The OCamlgraph graph *)
     mutable red_edges : (Slsyntax.SHterm.t * Slsyntax.SHterm.t) list; (* List of edges with weight 0 *)
     mutable unsat : bool;                 (* Indicates if the graph has become unsat or not *)
+    mutable black_edges : (Slsyntax.SHterm.t * Slsyntax.SHterm.t, unit)  Hashtbl.t;  (* Hashtable to update and keep track of inequalities - black edges *)
   }
 
   (* Initialize an empty graph structure *)
@@ -27,7 +28,11 @@ module WDGraph = struct
     graph = G.empty;
     red_edges = [];
     unsat = false;
+    black_edges = Hashtbl.create 1;
   }
+
+  let normalize_term_pair (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) : Slsyntax.SHterm.t * Slsyntax.SHterm.t  =
+    if Slsyntax.SHterm.compare u v <= 0 then (u, v) else (v, u)
 
   (* Add an edge to the graph. #TODO:Maybe can be shortened removing the 3rd if statement *)
   let add_edge (g : t) (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) (w : int) : unit =
@@ -46,12 +51,14 @@ module WDGraph = struct
               let g' = G.add_edge_e g' (u, 0, v) in
               g.graph <- g';
               g.red_edges <- (u, v) :: g.red_edges;
+              if w' = (-1) then Hashtbl.remove g.black_edges (normalize_term_pair u v)
 
         with Not_found ->
           (* If no edge exists, simply add it *)
           let g' = G.add_edge_e g.graph (u, w, v) in
           g.graph <- g';
-          if w = 0 then g.red_edges <- (u, v) :: g.red_edges
+          if w = 0 then g.red_edges <- (u, v) :: g.red_edges;
+          if w = (-1) then Hashtbl.replace g.black_edges (normalize_term_pair u v) ()
         end
       else
         (* Add the nodes if they don't exist *)
@@ -59,7 +66,8 @@ module WDGraph = struct
         let g' = G.add_edge_e g' (u, w, v) in
         g.graph <- g';
         (* Add to red_edges if the weight is 0 *)
-        if w = 0 then g.red_edges <- (u, v) :: g.red_edges
+        if w = 0 then g.red_edges <- (u, v) :: g.red_edges;
+        if w = (-1) then Hashtbl.replace g.black_edges (normalize_term_pair u v) ()
 
   (* Traverse all edges and return a list of (source, target, weight) *)
   let traverse_edges (g : t) : (Slsyntax.SHterm.t * Slsyntax.SHterm.t * int) list =
@@ -69,7 +77,7 @@ module WDGraph = struct
   let forms_cycle_with_red (g : t) : bool =
     List.exists (fun (u, v) ->
         let module Path = Path.Check(G) in
-        let pc = Path.create(g.graph) in
+        let pc = Path.create(g.graph) in 
         Path.check_path pc v u
       ) g.red_edges
 
@@ -94,6 +102,7 @@ module WDGraph = struct
                     add_edge g t1 t0 1;
                 | Neq -> 
                     add_edge g t0 t1 (-1);
+                    add_edge g t1 t0 (-1);
                 | Le -> add_edge g t0 t1 1;
                 | Lt -> add_edge g t0 t1 0;
         ) atoms
@@ -109,12 +118,15 @@ module WDGraph = struct
       [False]
     else 
       let edges = traverse_edges g in
+      let rb_atoms = 
+      List.filter (fun (u, v, w) -> w != (-1)) edges |>
       List.map (fun (u, v, w) ->
         match w with
-        | (-1) -> Slsyntax.SHpure.Atom(Neq, [u; v])
         | 0 -> Slsyntax.SHpure.Atom(Lt, [u; v])
         | 1 -> Slsyntax.SHpure.Atom(Le, [u; v])
-        | _ -> failwith "Unexpected weight value"
-      ) edges
+        | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
+      ) in
+      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> Slsyntax.SHpure.Atom(Neq, [u; v]) :: acc ) g.black_edges [] in
+      rb_atoms@black_atoms
 end
 
