@@ -45,7 +45,7 @@ module WDGraph = struct
           let edge = G.find_edge g.graph u v in
           match edge with
           | (_,w',_) ->
-            if w <> w' then (* #TODO:Should check what happens when the u!=v is present and want to add v<u *)
+            if w <> w' then
               (* Update the weight to 0 if the weights differ *)
               let g' = G.remove_edge_e g.graph (u, w', v) in
               let g' = G.add_edge_e g' (u, 0, v) in
