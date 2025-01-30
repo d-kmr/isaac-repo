@@ -10,17 +10,20 @@ module WDGraph = struct
     let hash = Hashtbl.hash
     let equal = (=)
   end)(struct
-    type t = int  (* Weight of edges *)
+    type t = int  (* label of edges *)
     let compare = compare
     let default = 0
   end)
 
   (* Define a record type for the graph structure *)
   type t = {
-    mutable graph : G.t;                  (* The OCamlgraph graph *)
+    mutable graph : G.t; (* The OCamlgraph graph *)
     mutable red_edges : (Slsyntax.SHterm.t * Slsyntax.SHterm.t) list; (* List of edges with weight 0 *)
-    mutable unsat : bool;                 (* Indicates if the graph has become unsat or not *)
-    mutable black_edges : (Slsyntax.SHterm.t * Slsyntax.SHterm.t, unit)  Hashtbl.t;  (* Hashtable to update and keep track of inequalities - black edges *)
+    mutable unsat : bool; (* Indicates if the graph has become unsat or not *)
+    mutable black_edges : (Slsyntax.SHterm.t * Slsyntax.SHterm.t, unit)  Hashtbl.t; (* Hashtable to update and keep track of inequalities - black edges *)
+    mutable n_scc : int; (* Number of SCCs present in the graph *)
+    mutable f_scc: (G.V.t -> int) option; (* Membership function, node -> SCC id *)
+    mutable r_scc: (int -> G.V.t) option; (* Representative function, SCC id -> representant node *)
   }
 
   (* Initialize an empty graph structure *)
@@ -29,6 +32,9 @@ module WDGraph = struct
     red_edges = [];
     unsat = false;
     black_edges = Hashtbl.create 1;
+    n_scc = -1;
+    f_scc = None;
+    r_scc = None;
   }
 
   let normalize_term_pair (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) : Slsyntax.SHterm.t * Slsyntax.SHterm.t  =
@@ -51,7 +57,9 @@ module WDGraph = struct
               let g' = G.add_edge_e g' (u, 0, v) in
               g.graph <- g';
               g.red_edges <- (u, v) :: g.red_edges;
-              if w' = (-1) then Hashtbl.remove g.black_edges (normalize_term_pair u v)
+              if w' = (-1) then 
+                g.graph <- G.remove_edge_e g.graph (v, w', u);
+                Hashtbl.remove g.black_edges (normalize_term_pair u v)
 
         with Not_found ->
           (* If no edge exists, simply add it *)
@@ -81,6 +89,18 @@ module WDGraph = struct
         Path.check_path pc v u
       ) g.red_edges
 
+  (* Returns a subgraph filtering edges by label *)
+  let subgraph_filter_edges (g : t) (predicate : int -> bool) : G.t =
+    let sub_g = ref G.empty in
+    let filter_edges = traverse_edges g |> List.filter (fun (u, v, w) -> predicate w) in
+    List.iter (fun (u, v, w) ->
+      sub_g := G.add_vertex !sub_g u;
+      sub_g := G.add_vertex !sub_g v;
+      (* Add the edge *)
+      sub_g := G.add_edge_e !sub_g (u, w, v)
+    ) filter_edges;
+    !sub_g
+  
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
   let preprocess_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
   
@@ -110,7 +130,29 @@ module WDGraph = struct
   (* Simplify the graph, i.e. post-analyssis of diferent properties *)
   let simplify (g : t) : unit = 
     if not (g.unsat) then
-      Printf.printf "Entering `simplify`.\n" (* #FIXME: Missing implementation *)
+      (* Check red contradiction *)
+      if forms_cycle_with_red g then g.unsat <- true
+      (* Compute SCCs *)
+      else
+        (* Create subgraph without black edges *)
+        let predicate label = label <> -1 in
+        let sub_g = subgraph_filter_edges g predicate in
+        (* Call scc method*)
+        let module SCC = Components.Make(G) in
+        let n_scc, f_scc = SCC.scc(sub_g) in
+        g.n_scc <- n_scc;
+        g.f_scc <- Some f_scc;
+        (* Make sure none f the black pairs are mapped to same SCC *)
+        (*Printf.printf "SCCs found: %d.\n" g.n_scc;*)
+        let black_pairs = Hashtbl.fold (fun (u, v) _ acc -> (u, v) :: acc ) g.black_edges [] in
+        begin try
+          if List.exists(fun (u, v) -> (f_scc u == f_scc v)) black_pairs then  
+            g.unsat <- true;
+        with Not_found ->
+          Printf.printf "SCCs found: %d.\n" g.n_scc;
+        end
+          (* Compute representatives for SCCs *)
+          (* Check blue contradiction *)
   
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
   let get_conjunctions (g : t) : Slsyntax.SHpure.t list = 
