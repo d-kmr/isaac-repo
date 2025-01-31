@@ -99,7 +99,7 @@ let () =
   let _ = WDGraph.add_edge g (Slsyntax.SHterm.Int 3) (Slsyntax.SHterm.Int 0) 1 in
 
   (* Traverse edges *)
-  let edges = WDGraph.traverse_edges g in
+  let edges = WDGraph.traverse_edges g.graph in
   List.iter (fun (Slsyntax.SHterm.Int u, Slsyntax.SHterm.Int v, w) ->
       Printf.printf "Edge: %d -> %d (Weight: %d)\n"  u v w
     ) edges;

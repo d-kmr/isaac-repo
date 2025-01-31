@@ -24,6 +24,7 @@ module WDGraph = struct
     mutable n_scc : int; (* Number of SCCs present in the graph *)
     mutable f_scc: (G.V.t -> int) option; (* Membership function, node -> SCC id *)
     mutable r_scc: (int -> G.V.t) option; (* Representative function, SCC id -> representant node *)
+    mutable quotient_graph : G.t;
   }
 
   (* Initialize an empty graph structure *)
@@ -35,6 +36,7 @@ module WDGraph = struct
     n_scc = -1;
     f_scc = None;
     r_scc = None;
+    quotient_graph = G.empty;
   }
 
   let normalize_term_pair (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) : Slsyntax.SHterm.t * Slsyntax.SHterm.t  =
@@ -77,9 +79,22 @@ module WDGraph = struct
         if w = 0 then g.red_edges <- (u, v) :: g.red_edges;
         if w = (-1) then Hashtbl.replace g.black_edges (normalize_term_pair u v) ()
 
+  let add_quotient_edge (g : t) (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) (w : int) : unit =
+    if not (g.unsat) then
+      try
+        let edge = G.find_edge g.quotient_graph u v in
+        match edge with
+        | (_,w',_) ->
+          if w <> w' then
+            (* Update the weight to 0 if the weights differ *)
+            let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
+            let g' = G.add_edge_e g' (u, 0, v) in
+            g.graph <- g'
+      with Not_found -> g.graph <- G.add_edge_e g.graph (u, w, v)
+
   (* Traverse all edges and return a list of (source, target, weight) *)
-  let traverse_edges (g : t) : (Slsyntax.SHterm.t * Slsyntax.SHterm.t * int) list =
-    G.fold_edges_e (fun (u, w, v) acc -> (u, v, w) :: acc) g.graph []
+  let traverse_edges (g : G.t) : (Slsyntax.SHterm.t * Slsyntax.SHterm.t * int) list =
+    G.fold_edges_e (fun (u, w, v) acc -> (u, v, w) :: acc) g []
 
   (* Check if any of the red edges forms a cycle *)
   let forms_cycle_with_red (g : t) : bool =
@@ -92,13 +107,10 @@ module WDGraph = struct
   (* Returns a subgraph filtering edges by label *)
   let subgraph_filter_edges (g : t) (predicate : int -> bool) : G.t =
     let sub_g = ref G.empty in
-    let filter_edges = traverse_edges g |> List.filter (fun (u, v, w) -> predicate w) in
-    List.iter (fun (u, v, w) ->
-      sub_g := G.add_vertex !sub_g u;
-      sub_g := G.add_vertex !sub_g v;
-      (* Add the edge *)
-      sub_g := G.add_edge_e !sub_g (u, w, v)
-    ) filter_edges;
+    let vertices = G.fold_vertex(fun u acc -> u :: acc) g.graph [] in
+    List.iter(fun u -> sub_g := G.add_vertex !sub_g u) vertices;
+    let filter_edges = traverse_edges g.graph |> List.filter (fun (u, v, w) -> predicate w) in
+    List.iter (fun (u, v, w) ->sub_g := G.add_edge_e !sub_g (u, w, v)) filter_edges;
     !sub_g
   
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
@@ -142,24 +154,54 @@ module WDGraph = struct
         let n_scc, f_scc = SCC.scc(sub_g) in
         g.n_scc <- n_scc;
         g.f_scc <- Some f_scc;
-        (* Make sure none f the black pairs are mapped to same SCC *)
-        (*Printf.printf "SCCs found: %d.\n" g.n_scc;*)
+        
         let black_pairs = Hashtbl.fold (fun (u, v) _ acc -> (u, v) :: acc ) g.black_edges [] in
-        begin try
-          if List.exists(fun (u, v) -> (f_scc u == f_scc v)) black_pairs then  
-            g.unsat <- true;
-        with Not_found ->
-          Printf.printf "SCCs found: %d.\n" g.n_scc;
-        end
-          (* Compute representatives for SCCs *)
-          (* Check blue contradiction *)
+
+        if List.exists(fun (u, v) -> (f_scc u == f_scc v)) black_pairs then g.unsat <- true
+        else 
+            (* Compute representatives for SCCs *)
+            let scc_nodes = Hashtbl.create n_scc in
+            G.iter_vertex (fun v ->
+              let id = f_scc v in
+              Hashtbl.add scc_nodes id v
+            ) g.graph;
+            
+            let representatives = Array.make n_scc (Slsyntax.SHterm.Int 0) (* Placeholder initial value *) in
+            for i = 0 to n_scc - 1 do
+              let nodes = Hashtbl.find_all scc_nodes i in
+              let int_terms = List.filter (function Slsyntax.SHterm.Int _ -> true | _ -> false) nodes in
+              match int_terms with
+              | [a] -> Array.set representatives i a (* Exactly one Int term *)
+              | _ when List.length int_terms > 1 ->  (* Check blue contradiction / more than one int term within a SCC *)
+                  g.unsat <- true
+              | _ -> 
+                  let var_nodes = List.filter (function Slsyntax.SHterm.Var _ -> true | _ -> false) nodes in
+                  let chosen = 
+                    if var_nodes <> [] then List.hd var_nodes 
+                    else List.hd nodes 
+                  in
+                  Array.set representatives i chosen
+            done;
+
+            let r_scc = (fun (id : int) ->  Array.get representatives id) in
+            g.r_scc <- Some r_scc;
+            
+            (* Build quotient graph / reduce graph *)
+            Array.iter(fun rep -> 
+              let g' = G.add_vertex g.quotient_graph rep in
+              g.quotient_graph <- g'
+              );
+            let edges = traverse_edges g.graph in
+            List.iter(fun (u,v,w) -> add_quotient_edge g (r_scc (f_scc u)) (r_scc (f_scc v)) w) edges;
+            Array.iter(fun rep -> Slsyntax.SHterm.println rep) representatives
+       
   
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
   let get_conjunctions (g : t) : Slsyntax.SHpure.t list = 
     if g.unsat then 
       [False]
     else 
-      let edges = traverse_edges g in
+      let edges = traverse_edges g.quotient_graph in
       let rb_atoms = 
       List.filter (fun (u, v, w) -> w != (-1)) edges |>
       List.map (fun (u, v, w) ->
