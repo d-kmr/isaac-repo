@@ -89,8 +89,8 @@ module WDGraph = struct
             (* Update the weight to 0 if the weights differ *)
             let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
             let g' = G.add_edge_e g' (u, 0, v) in
-            g.graph <- g'
-      with Not_found -> g.graph <- G.add_edge_e g.graph (u, w, v)
+            g.quotient_graph <- g'
+      with Not_found -> g.quotient_graph <- G.add_edge_e g.quotient_graph (u, w, v)
 
   (* Traverse all edges and return a list of (source, target, weight) *)
   let traverse_edges (g : G.t) : (Slsyntax.SHterm.t * Slsyntax.SHterm.t * int) list =
@@ -114,7 +114,7 @@ module WDGraph = struct
     !sub_g
   
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
-  let preprocess_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
+  let postprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
   
   (* Given a list of Atoms (conjunction of them) extract the terms and type of edge and add it to the graph *)
   let add_conjunctions (g : t) (atoms : Slsyntax.SHpure.t list): unit = 
@@ -185,16 +185,18 @@ module WDGraph = struct
 
             let r_scc = (fun (id : int) ->  Array.get representatives id) in
             g.r_scc <- Some r_scc;
-            
             (* Build quotient graph / reduce graph *)
             Array.iter(fun rep -> 
               let g' = G.add_vertex g.quotient_graph rep in
               g.quotient_graph <- g'
               );
-            let edges = traverse_edges g.graph in
-            List.iter(fun (u,v,w) -> add_quotient_edge g (r_scc (f_scc u)) (r_scc (f_scc v)) w) edges;
-            Array.iter(fun rep -> Slsyntax.SHterm.println rep) representatives
-       
+            let edges = traverse_edges sub_g in
+            List.iter(fun (u,v,w) ->
+               let r_u = r_scc (f_scc u) in
+               let r_v = r_scc (f_scc v) in
+               if r_u <> r_v then  (* avoid redundant edges within the same SCC *)
+                add_quotient_edge g r_u r_v w) 
+            edges
   
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
   let get_conjunctions (g : t) : Slsyntax.SHpure.t list = 

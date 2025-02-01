@@ -109,7 +109,7 @@ let process_conjunctions (p : SHpure.t) (_stats : bool) : SHpure.t =
       let elapsed_time_build = end_time_build -. start_time_build in
       if _stats then
         Printf.printf "Execution time build graph: %f seconds\n" elapsed_time_build;
-
+      
       let start_time_simplify = Unix.gettimeofday () in
       let _ = WDGraph.simplify g in 
       let end_time_simplify = Unix.gettimeofday () in
@@ -125,9 +125,7 @@ let process_conjunctions (p : SHpure.t) (_stats : bool) : SHpure.t =
         Printf.printf "Execution time re-build graph: %f seconds\n" elapsed_time_rebuild;
 
       And simplified_conjunctions
-  | _ ->
-      failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
-
+  | _ -> failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
 
 (* Currently do nothing *)
 let simplify_pure (p : SHpure.t) (_stats : bool) : SHpure.t =
