@@ -114,6 +114,9 @@ module WDGraph = struct
     !sub_g
   
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
+  let preprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
+
+  (* Postprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
   let postprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
   
   (* Given a list of Atoms (conjunction of them) extract the terms and type of edge and add it to the graph *)
