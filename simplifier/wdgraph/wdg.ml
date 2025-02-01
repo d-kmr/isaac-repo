@@ -24,7 +24,7 @@ module WDGraph = struct
     mutable n_scc : int; (* Number of SCCs present in the graph *)
     mutable f_scc: (G.V.t -> int) option; (* Membership function, node -> SCC id *)
     mutable r_scc: (int -> G.V.t) option; (* Representative function, SCC id -> representant node *)
-    mutable quotient_graph : G.t;
+    mutable quotient_graph : G.t; (* The OCamlgraphquotient graph *)
   }
 
   (* Initialize an empty graph structure *)
@@ -46,38 +46,32 @@ module WDGraph = struct
   let add_edge (g : t) (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) (w : int) : unit =
     if w = (-1) && u = v then g.unsat <- true; (* Black contradiction *)
     if not (g.unsat) then
-      (* Check if both nodes exist in the variable_mapping *)
-      if G.mem_vertex g.graph u && G.mem_vertex g.graph v then begin
-        (* Check if there is an existing edge between u and v *)
+      (* Make sure nodes exist *)
+      let g' = G.add_vertex (G.add_vertex g.graph u) v in
+      let black_pair = normalize_term_pair u v in
+        (* Check if there is an existing black edge between u and v *)
         try
-          let edge = G.find_edge g.graph u v in
-          match edge with
-          | (_,w',_) ->
-            if w <> w' then
-              (* Update the weight to 0 if the weights differ *)
-              let g' = G.remove_edge_e g.graph (u, w', v) in
-              let g' = G.add_edge_e g' (u, 0, v) in
-              g.graph <- g';
-              g.red_edges <- (u, v) :: g.red_edges;
-              if w' = (-1) then 
-                g.graph <- G.remove_edge_e g.graph (v, w', u);
-                Hashtbl.remove g.black_edges (normalize_term_pair u v)
-
-        with Not_found ->
-          (* If no edge exists, simply add it *)
-          let g' = G.add_edge_e g.graph (u, w, v) in
+          let _ = Hashtbl.find g.black_edges black_pair in
+          let g' = G.add_edge_e g' (u, 0, v) in
           g.graph <- g';
-          if w = 0 then g.red_edges <- (u, v) :: g.red_edges;
-          if w = (-1) then Hashtbl.replace g.black_edges (normalize_term_pair u v) ()
-        end
-      else
-        (* Add the nodes if they don't exist *)
-        let g' = G.add_vertex (G.add_vertex g.graph u) v in
-        let g' = G.add_edge_e g' (u, w, v) in
-        g.graph <- g';
-        (* Add to red_edges if the weight is 0 *)
-        if w = 0 then g.red_edges <- (u, v) :: g.red_edges;
-        if w = (-1) then Hashtbl.replace g.black_edges (normalize_term_pair u v) ()
+          g.red_edges <- (u, v) :: g.red_edges;
+          Hashtbl.remove g.black_edges black_pair
+        with Not_found ->
+          try
+            let edge = G.find_edge g' u v in
+            match edge with
+            | (_,w',_) ->
+              if w <> w' then
+                (* Update the weight to 0 if the weights differ *)
+                let g' = G.remove_edge_e g' (u, w', v) in
+                let g' = G.add_edge_e g' (u, 0, v) in
+                g.graph <- g';
+                g.red_edges <- (u, v) :: g.red_edges;
+          with Not_found ->
+            (* If no edge exists, simply add it *)
+            let g' = G.add_edge_e g' (u, w, v) in
+            g.graph <- g';
+            if w = 0 then g.red_edges <- (u, v) :: g.red_edges
 
   let add_quotient_edge (g : t) (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) (w : int) : unit =
     if not (g.unsat) then
@@ -90,28 +84,15 @@ module WDGraph = struct
             let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
             let g' = G.add_edge_e g' (u, 0, v) in
             g.quotient_graph <- g'
-      with Not_found -> g.quotient_graph <- G.add_edge_e g.quotient_graph (u, w, v)
-
-  (* Traverse all edges and return a list of (source, target, weight) *)
-  let traverse_edges (g : G.t) : (Slsyntax.SHterm.t * Slsyntax.SHterm.t * int) list =
-    G.fold_edges_e (fun (u, w, v) acc -> (u, v, w) :: acc) g []
+      with Not_found -> 
+        let g' = G.add_edge_e g.quotient_graph (u, w, v) in
+        g.quotient_graph <- g'
 
   (* Check if any of the red edges forms a cycle *)
   let forms_cycle_with_red (g : t) : bool =
-    List.exists (fun (u, v) ->
-        let module Path = Path.Check(G) in
-        let pc = Path.create(g.graph) in 
-        Path.check_path pc v u
-      ) g.red_edges
-
-  (* Returns a subgraph filtering edges by label *)
-  let subgraph_filter_edges (g : t) (predicate : int -> bool) : G.t =
-    let sub_g = ref G.empty in
-    let vertices = G.fold_vertex(fun u acc -> u :: acc) g.graph [] in
-    List.iter(fun u -> sub_g := G.add_vertex !sub_g u) vertices;
-    let filter_edges = traverse_edges g.graph |> List.filter (fun (u, v, w) -> predicate w) in
-    List.iter (fun (u, v, w) ->sub_g := G.add_edge_e !sub_g (u, w, v)) filter_edges;
-    !sub_g
+    let module Path = Path.Check(G) in
+    let pc = Path.create(g.graph) in 
+    List.exists (fun (u, v) -> Path.check_path pc v u) g.red_edges
   
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
   let preprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
@@ -126,7 +107,7 @@ module WDGraph = struct
           match a with
           | Slsyntax.SHpure.False -> g.unsat <- true;
           | Slsyntax.SHpure.Atom (op, tt) ->
-            let a' = preprocess_atom a in
+            let a' = preprocess_and_eval_atom a in
             match a' with
             | Slsyntax.SHpure.Atom (op, tt) ->
               let t0 = List.nth tt 0 in
@@ -136,8 +117,8 @@ module WDGraph = struct
                     add_edge g t0 t1 1;
                     add_edge g t1 t0 1;
                 | Neq -> 
-                    add_edge g t0 t1 (-1);
-                    add_edge g t1 t0 (-1);
+                  g.graph <- G.add_vertex (G.add_vertex g.graph t0) t1;
+                  Hashtbl.replace g.black_edges (normalize_term_pair t0 t1) ();
                 | Le -> add_edge g t0 t1 1;
                 | Lt -> add_edge g t0 t1 0;
         ) atoms
@@ -149,25 +130,17 @@ module WDGraph = struct
       if forms_cycle_with_red g then g.unsat <- true
       (* Compute SCCs *)
       else
-        (* Create subgraph without black edges *)
-        let predicate label = label <> -1 in
-        let sub_g = subgraph_filter_edges g predicate in
         (* Call scc method*)
         let module SCC = Components.Make(G) in
-        let n_scc, f_scc = SCC.scc(sub_g) in
+        let n_scc, f_scc = SCC.scc(g.graph) in
         g.n_scc <- n_scc;
         g.f_scc <- Some f_scc;
-        
-        let black_pairs = Hashtbl.fold (fun (u, v) _ acc -> (u, v) :: acc ) g.black_edges [] in
-
-        if List.exists(fun (u, v) -> (f_scc u == f_scc v)) black_pairs then g.unsat <- true
+        let black_pairs_in_same_scc = Hashtbl.fold (fun (u, v) _ acc -> acc || (f_scc u == f_scc v)) g.black_edges false in
+        if black_pairs_in_same_scc then g.unsat <- true (* Black contradiction 2 *)
         else 
             (* Compute representatives for SCCs *)
             let scc_nodes = Hashtbl.create n_scc in
-            G.iter_vertex (fun v ->
-              let id = f_scc v in
-              Hashtbl.add scc_nodes id v
-            ) g.graph;
+            G.iter_vertex (fun v -> Hashtbl.add scc_nodes (f_scc v) v) g.graph;
             
             let representatives = Array.make n_scc (Slsyntax.SHterm.Int 0) (* Placeholder initial value *) in
             for i = 0 to n_scc - 1 do
@@ -190,31 +163,27 @@ module WDGraph = struct
             g.r_scc <- Some r_scc;
             (* Build quotient graph / reduce graph *)
             Array.iter(fun rep -> 
-              let g' = G.add_vertex g.quotient_graph rep in
-              g.quotient_graph <- g'
-              );
-            let edges = traverse_edges sub_g in
-            List.iter(fun (u,v,w) ->
+              let g' = G.add_vertex g.quotient_graph rep in 
+              g.quotient_graph <- g') representatives;
+            G.iter_edges_e (fun (u, w, v) ->
                let r_u = r_scc (f_scc u) in
                let r_v = r_scc (f_scc v) in
                if r_u <> r_v then  (* avoid redundant edges within the same SCC *)
                 add_quotient_edge g r_u r_v w) 
-            edges
+            g.graph
   
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
   let get_conjunctions (g : t) : Slsyntax.SHpure.t list = 
     if g.unsat then 
       [False]
     else 
-      let edges = traverse_edges g.quotient_graph in
       let rb_atoms = 
-      List.filter (fun (u, v, w) -> w != (-1)) edges |>
-      List.map (fun (u, v, w) ->
+      G.fold_edges_e (fun (u, w, v) acc -> 
         match w with
-        | 0 -> Slsyntax.SHpure.Atom(Lt, [u; v])
-        | 1 -> Slsyntax.SHpure.Atom(Le, [u; v])
+        | 0 -> Slsyntax.SHpure.Atom(Lt, [u; v]) :: acc
+        | 1 -> Slsyntax.SHpure.Atom(Le, [u; v]) :: acc
         | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
-      ) in
+      ) g.quotient_graph [] in
       let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> Slsyntax.SHpure.Atom(Neq, [u; v]) :: acc ) g.black_edges [] in
       rb_atoms@black_atoms
 end
