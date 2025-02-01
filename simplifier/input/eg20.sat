@@ -7,7 +7,8 @@
 // (spat)      S := s | S '*' S
 // (symb.heap) H := P "&&" S
 
-(x <> 0 => (y <> 0 & z <> 0 & z > 0)) & x = 5
+x=4 & x <= y & y <= 4 & y < (a+4) & 4 < b & b >= (a+4) & b <= c & c <= (a+4) & c < s & t > s & r >= t & r <= t & s <= r  
+//x=4 & x <= y & y <= 4 & y < (a+4) & 4 < b & b >= (a+4) & b <= c & c >= (a+4) & c < s & t > s & r >= t & r <= t & s <= r  
 &&
 Emp
 

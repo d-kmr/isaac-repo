@@ -5,10 +5,10 @@
 // (fieldterm) f := t | <string> ':' t  
 // (spat atom) s := "Emp" | t "->" '(' f* ')' | "Arr" '(' t ',' t ')' | "Str" '(' t ',' t ')' | "Ls" '(' t ',' t ')'
 // (spat)      S := s | S '*' S
-// (symb.heap) H := P "&" S
+// (symb.heap) H := P "&&" S
 
 t1'@hat > t2'@hat
-&
+&&
 t1'@hat -> (*:x)
 *
 t2'@hat+#size@hat -> (f:10)

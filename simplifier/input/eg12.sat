@@ -5,6 +5,6 @@
 // (fieldterm) f := t | <string> ':' t  
 // (spat atom) s := "Emp" | t "->" '(' f* ')' | "Arr" '(' t ',' t ')' | "Str" '(' t ',' t ')' | "Ls" '(' t ',' t ')'
 // (spat)      S := s | S '*' S
-// (symb.heap) H := P "&" S
+// (symb.heap) H := P "&&" S
 
-(a@hat > b@hat) & Emp
+(a@hat > b@hat) && Emp
