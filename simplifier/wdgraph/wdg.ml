@@ -97,8 +97,33 @@ module WDGraph = struct
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
   let preprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
 
-  (* Postprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
-  let postprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
+  (* Postprocess an Atom s.t. its terms are minimal *)
+  let rec postprocess_and_eval_terms (g : t) (a : Slsyntax.SHterm.t) : Slsyntax.SHterm.t =
+  (* on complex epesion try to recursively match terms into representative method until u find one and stop *)
+  let r_scc = match g.r_scc with 
+  | Some f -> f
+  | _ -> failwith "r_scc not computed before `postprocess_and_eval_terms`" in
+  let f_scc = match g.f_scc with 
+  | Some f -> f
+  | _ -> failwith "f_scc not computed before `postprocess_and_eval_terms`" in 
+  match a with 
+  | Var _ -> a
+  | Int _ -> a
+  | PosInf -> a
+  | NegInf -> a
+  (*| Add ts -> try Add List.fold(fun t acc -> try (r_scc (f_scc t)) :: acc with Not_found -> (postprocess_and_eval_terms t) :: acc) ts [] with Not_found -> a
+  | Sub ts -> try Sub List.fold(fun t acc -> try (r_scc (f_scc t)) :: acc with Not_found -> (postprocess_and_eval_terms t) :: acc) ts [] with Not_found -> a*)
+  | Mul (t0, t1) -> try Mul (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> a(*Mul (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)*)
+  (*| Div (t0, t1) -> try Div (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Div (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
+  | Mod (t0, t1) -> try Mod (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Mod (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
+  | Shr (t0, t1) -> try Shr (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shr (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
+  | Shl (t0, t1) -> try Shl (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shl (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
+  | Band (t0, t1) -> try Band (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Band (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
+  | Bor (t0, t1) -> try Bor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bor (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
+  | Bxor (t0, t1) -> try Bxor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bxor (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
+  | Bnot t ->  try Bnot (r_scc (f_scc t)) with Not_found -> Bnot (postprocess_and_eval_terms t)
+  | Fcall (f, ts) ->  try Fcall (f, List.fold(fun t acc -> try (r_scc (f_scc t)) :: acc with Not_found -> (postprocess_and_eval_terms t) :: acc) ts []) with Not_found -> a*)
+  (* eval them and reduce integers *)
   
   (* Given a list of Atoms (conjunction of them) extract the terms and type of edge and add it to the graph *)
   let add_conjunctions (g : t) (atoms : Slsyntax.SHpure.t list): unit = 
@@ -179,12 +204,17 @@ module WDGraph = struct
     else 
       let rb_atoms = 
       G.fold_edges_e (fun (u, w, v) acc -> 
+        let u' = postprocess_and_eval_terms u in
+        let v' = postprocess_and_eval_terms v in
         match w with
-        | 0 -> Slsyntax.SHpure.Atom(Lt, [u; v]) :: acc
-        | 1 -> Slsyntax.SHpure.Atom(Le, [u; v]) :: acc
+        | 0 -> Slsyntax.SHpure.Atom(Lt, [u'; v']) :: acc
+        | 1 -> Slsyntax.SHpure.Atom(Le, [u'; v']) :: acc
         | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
       ) g.quotient_graph [] in
-      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> Slsyntax.SHpure.Atom(Neq, [u; v]) :: acc ) g.black_edges [] in
+      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> 
+        let u' = postprocess_and_eval_terms u in
+        let v' = postprocess_and_eval_terms v in
+        Slsyntax.SHpure.Atom(Neq, [u'; v']) :: acc ) g.black_edges [] in
       rb_atoms@black_atoms
 end
 
