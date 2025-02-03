@@ -100,6 +100,7 @@ let to_dnf (p: SHpure.t) : SHpure.t =
 
 let process_conjunctions (p : SHpure.t) (_stats : bool) : SHpure.t =
   match p with
+  | Atom (_, _) -> p
   | And conjunctions ->
       let g = WDGraph.create () in
 
