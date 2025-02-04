@@ -125,8 +125,15 @@ let process_conjunctions (p : SHpure.t) (_stats : bool) : SHpure.t =
       if _stats then
         Printf.printf "Execution time re-build graph: %f seconds\n" elapsed_time_rebuild;
 
-      And simplified_conjunctions
+      begin match simplified_conjunctions with
+      | [False] -> False
+      | _ -> And simplified_conjunctions
+      end
   | _ -> failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
+
+(* Currently just filtering falses *)
+let rec process_disjunction (p : SHpure.t list) : SHpure.t list = 
+  List.filter(fun p' -> p' <> SHpure.False) p
 
 (* Currently do nothing *)
 let simplify_pure (p : SHpure.t) (_stats : bool) : SHpure.t =
@@ -137,7 +144,7 @@ let simplify_pure (p : SHpure.t) (_stats : bool) : SHpure.t =
   if _stats then
     Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
   match dnf_p with
-  | Or clauses -> Or (List.map (fun clause -> process_conjunctions clause _stats) clauses)
+  | Or clauses -> Or (process_disjunction(List.map (fun clause -> process_conjunctions clause _stats) clauses))
   | And _ -> process_conjunctions dnf_p _stats
   | _ -> dnf_p
   

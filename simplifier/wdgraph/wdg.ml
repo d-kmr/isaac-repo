@@ -18,9 +18,10 @@ module WDGraph = struct
   (* Define a record type for the graph structure *)
   type t = {
     mutable graph : G.t; (* The OCamlgraph graph *)
-    mutable red_edges : (Slsyntax.SHterm.t * Slsyntax.SHterm.t) list; (* List of edges with weight 0 *)
+    mutable red_edges : (SHterm.t * SHterm.t) list; (* List of edges with weight 0 *)
+    mutable eq_representative_pairs : (SHterm.t * SHterm.t) list; (* List of pairs node*representative *)
     mutable unsat : bool; (* Indicates if the graph has become unsat or not *)
-    mutable black_edges : (Slsyntax.SHterm.t * Slsyntax.SHterm.t, unit)  Hashtbl.t; (* Hashtable to update and keep track of inequalities - black edges *)
+    mutable black_edges : (SHterm.t * SHterm.t, unit)  Hashtbl.t; (* Hashtable to update and keep track of inequalities - black edges *)
     mutable n_scc : int; (* Number of SCCs present in the graph *)
     mutable f_scc: (G.V.t -> int) option; (* Membership function, node -> SCC id *)
     mutable r_scc: (int -> G.V.t) option; (* Representative function, SCC id -> representant node *)
@@ -31,6 +32,7 @@ module WDGraph = struct
   let create () : t = {
     graph = G.empty;
     red_edges = [];
+    eq_representative_pairs = [];
     unsat = false;
     black_edges = Hashtbl.create 1;
     n_scc = -1;
@@ -39,11 +41,11 @@ module WDGraph = struct
     quotient_graph = G.empty;
   }
 
-  let normalize_term_pair (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) : Slsyntax.SHterm.t * Slsyntax.SHterm.t  =
-    if Slsyntax.SHterm.compare u v <= 0 then (u, v) else (v, u)
+  let normalize_term_pair (u : SHterm.t) (v : SHterm.t) : SHterm.t * SHterm.t  =
+    if SHterm.compare u v <= 0 then (u, v) else (v, u)
 
   (* Add an edge to the graph. #TODO:Maybe can be shortened removing the 3rd if statement *)
-  let add_edge (g : t) (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) (w : int) : unit =
+  let add_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : int) : unit =
     if w = (-1) && u = v then g.unsat <- true; (* Black contradiction *)
     if not (g.unsat) then
       (* Make sure nodes exist *)
@@ -73,7 +75,7 @@ module WDGraph = struct
             g.graph <- g';
             if w = 0 then g.red_edges <- (u, v) :: g.red_edges
 
-  let add_quotient_edge (g : t) (u : Slsyntax.SHterm.t) (v : Slsyntax.SHterm.t) (w : int) : unit =
+  let add_quotient_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : int) : unit =
     if not (g.unsat) then
       try
         let edge = G.find_edge g.quotient_graph u v in
@@ -95,21 +97,21 @@ module WDGraph = struct
     List.exists (fun (u, v) -> Path.check_path pc v u) g.red_edges
   
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
-  let preprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
+  let preprocess_and_eval_atom (a : SHpure.t) : SHpure.t = a (* #FIXME:Missing implementation *)
 
   (* Postprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
-  let postprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
+  let postprocess_and_eval_atom (a : SHpure.t) : SHpure.t = a (* #FIXME:Missing implementation *)
   
   (* Given a list of Atoms (conjunction of them) extract the terms and type of edge and add it to the graph *)
-  let add_conjunctions (g : t) (atoms : Slsyntax.SHpure.t list): unit = 
+  let add_conjunctions (g : t) (atoms : SHpure.t list): unit = 
       List.iter (fun a ->
         if not (g.unsat) then
           match a with
-          | Slsyntax.SHpure.False -> g.unsat <- true;
-          | Slsyntax.SHpure.Atom (op, tt) ->
+          | SHpure.False -> g.unsat <- true;
+          | SHpure.Atom (op, tt) ->
             let a' = preprocess_and_eval_atom a in
             match a' with
-            | Slsyntax.SHpure.Atom (op, tt) ->
+            | SHpure.Atom (op, tt) ->
               let t0 = List.nth tt 0 in
               let t1 = List.nth tt 1 in
                 match op with
@@ -142,21 +144,29 @@ module WDGraph = struct
             let scc_nodes = Hashtbl.create n_scc in
             G.iter_vertex (fun v -> Hashtbl.add scc_nodes (f_scc v) v) g.graph;
             
-            let representatives = Array.make n_scc (Slsyntax.SHterm.Int 0) (* Placeholder initial value *) in
+            let representatives = Array.make n_scc (SHterm.Int 0) (* Placeholder initial value *) in
             for i = 0 to n_scc - 1 do
               let nodes = Hashtbl.find_all scc_nodes i in
-              let int_terms = List.filter (function Slsyntax.SHterm.Int _ -> true | _ -> false) nodes in
-              match int_terms with
-              | [a] -> Array.set representatives i a (* Exactly one Int term *)
-              | _ when List.length int_terms > 1 ->  (* Check blue contradiction / more than one int term within a SCC *)
-                  g.unsat <- true
-              | _ -> 
-                  let var_nodes = List.filter (function Slsyntax.SHterm.Var _ -> true | _ -> false) nodes in
-                  let chosen = 
-                    if var_nodes <> [] then List.hd var_nodes 
-                    else List.hd nodes 
-                  in
-                  Array.set representatives i chosen
+              let int_terms = List.filter (function SHterm.Int _ -> true | _ -> false) nodes in
+              let chosen_rep = 
+                begin match int_terms with
+                | [a] -> Array.set representatives i a; a (* Exactly one Int term *)
+                | _ when List.length int_terms > 1 ->  (* Check blue contradiction / more than one int term within a SCC *)
+                    g.unsat <- true; List.hd int_terms
+                | _ -> 
+                    let var_nodes = List.filter (function SHterm.Var _ -> true | _ -> false) nodes in
+                    let chosen = 
+                      if var_nodes <> [] then List.hd var_nodes 
+                      else List.hd nodes 
+                    in
+                    Array.set representatives i chosen;
+                    chosen
+                end
+              in
+              List.iter(fun u -> 
+                if u <> chosen_rep then 
+                  g.eq_representative_pairs <- (u, chosen_rep) :: g.eq_representative_pairs
+                ) nodes
             done;
 
             let r_scc = (fun (id : int) ->  Array.get representatives id) in
@@ -173,18 +183,19 @@ module WDGraph = struct
             g.graph
   
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
-  let get_conjunctions (g : t) : Slsyntax.SHpure.t list = 
+  let get_conjunctions (g : t) : SHpure.t list = 
     if g.unsat then 
       [False]
     else 
       let rb_atoms = 
       G.fold_edges_e (fun (u, w, v) acc -> 
         match w with
-        | 0 -> Slsyntax.SHpure.Atom(Lt, [u; v]) :: acc
-        | 1 -> Slsyntax.SHpure.Atom(Le, [u; v]) :: acc
+        | 0 -> SHpure.Atom(Lt, [u; v]) :: acc
+        | 1 -> SHpure.Atom(Le, [u; v]) :: acc
         | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
       ) g.quotient_graph [] in
-      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> Slsyntax.SHpure.Atom(Neq, [u; v]) :: acc ) g.black_edges [] in
-      rb_atoms@black_atoms
+      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> SHpure.Atom(Neq, [u; v]) :: acc ) g.black_edges [] in
+      let eq_atoms = List.map(fun (u, v) -> SHpure.Atom(Eq, [u; v])) g.eq_representative_pairs in
+      eq_atoms@rb_atoms@black_atoms
 end
 
