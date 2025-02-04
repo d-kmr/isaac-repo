@@ -93,9 +93,6 @@ module WDGraph = struct
     let module Path = Path.Check(G) in
     let pc = Path.create(g.graph) in 
     List.exists (fun (u, v) -> Path.check_path pc v u) g.red_edges
-  
-  (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
-  let preprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
 
   (* Postprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
   let postprocess_and_eval_atom (a : Slsyntax.SHpure.t) : Slsyntax.SHpure.t = a (* #FIXME:Missing implementation *)
@@ -107,20 +104,17 @@ module WDGraph = struct
           match a with
           | Slsyntax.SHpure.False -> g.unsat <- true;
           | Slsyntax.SHpure.Atom (op, tt) ->
-            let a' = preprocess_and_eval_atom a in
-            match a' with
-            | Slsyntax.SHpure.Atom (op, tt) ->
-              let t0 = List.nth tt 0 in
-              let t1 = List.nth tt 1 in
-                match op with
-                | Eq -> 
-                    add_edge g t0 t1 1;
-                    add_edge g t1 t0 1;
-                | Neq -> 
-                  g.graph <- G.add_vertex (G.add_vertex g.graph t0) t1;
-                  Hashtbl.replace g.black_edges (normalize_term_pair t0 t1) ();
-                | Le -> add_edge g t0 t1 1;
-                | Lt -> add_edge g t0 t1 0;
+          let t0 = List.nth tt 0 in
+          let t1 = List.nth tt 1 in
+            match op with
+            | Eq -> 
+                add_edge g t0 t1 1;
+                add_edge g t1 t0 1;
+            | Neq -> 
+              g.graph <- G.add_vertex (G.add_vertex g.graph t0) t1;
+              Hashtbl.replace g.black_edges (normalize_term_pair t0 t1) ();
+            | Le -> add_edge g t0 t1 1;
+            | Lt -> add_edge g t0 t1 0;
         ) atoms
 
   (* Simplify the graph, i.e. post-analyssis of diferent properties *)

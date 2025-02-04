@@ -59,6 +59,80 @@ let rec distribute (p: SHpure.t) : SHpure.t=
   | And clauses -> And (List.map distribute clauses)
   | _ -> p
 
+(*let identity_element p = 
+  match p with
+  | Add _ -> 0
+  | Sub _ -> 0
+  | Mul _ -> 1
+  | Div _ -> 1
+  | Mod _ -> 1
+  | Shr _ -> 0
+  | Shl _ -> 0
+  | Band _ -> 1
+  | Bor _ -> 0*)
+
+let rec filter_identities (e : Slsyntax.SHterm.t) : Slsyntax.SHterm.t =
+  match e with
+  |SHterm.Add args -> 
+    let neutral_elem_zero = List.filter (function SHterm.Int 0 -> false | _ -> true) args in
+    SHterm.Add (List.map filter_identities neutral_elem_zero)
+  |SHterm.Sub args -> 
+    let neutral_elem_zero = List.filter (function SHterm.Int 0 -> false | _ -> true) args in
+    SHterm.Sub (List.map filter_identities neutral_elem_zero)
+  
+  |Mul t0, Int 1 -> t0
+  |Mul Int 1, t1 -> t1
+  |Mul Int x, Int y -> Int (x*y)
+  |Mul t0, t1 -> Mul t0, t1
+
+  |Div t0, Int 1 -> t0
+  |Div Int x, Int y -> Int (x/y)
+  |Div t0, t1 -> Div t0, t1
+
+  |Mod _, Int 1 | Mod Int 0, _ -> Int 0
+  |Mod Int 1, _ -> Int 1
+  |Mod Int x, Int y -> Int (x%y)
+  |Mod t0, t1 -> Mod t0, t1
+
+  |Shr t0, Int 0 -> t0
+  |Shr Int x, Int y -> Int (x>>y)
+  |Shr t0, t1 -> Shr t0, t1
+
+  |Shl t0, Int 0 -> t0
+  |Shl Int x, Int y -> Int (x<<y)
+  |Shl t0, t1 -> Shl t0, t1
+
+  |SHterm.Band args -> 
+    let neutral_elem_one = List.filter (function SHterm.Int 1 -> false | _ -> true) args in
+    SHterm.Band (List.map filter_identities neutral_elem_one)
+  |SHterm.Bor args -> 
+    let neutral_elem_zero = List.filter (function SHterm.Int 0 -> false | _ -> true) args in
+    SHterm.Bor (List.map filter_identities neutral_elem_zero)
+  | _ -> e 
+
+let rec group_constants (e :Slsyntax.SHterm.t) : Slsyntax.SHterm.t = e 
+
+let rec remove_mirror_terms (e :Slsyntax.SHterm.t) : Slsyntax.SHterm.t = e 
+
+(* Remove same variables in both equation sides *)
+
+(* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions *)
+let rec preprocess_and_eval_atom (p : Slsyntax.SHpure.t) : Slsyntax.SHpure.t =
+  (* Apply arithmetic, identities and same variable elimination on both sides, also #size >= 0  implicit (on post process avoid this ones) *)
+  match p with
+  | Atom (op, tt) ->
+    let t0 = List.nth tt 0 in
+    let t1 = List.nth tt 1 in
+    let tt' = [filter_identities t0; filter_identities t1] in
+    begin match op with 
+    | Eq -> p
+    | Neq -> p
+    | Lt -> 
+      begin match tt' with [Var (x, a); Add ([Int 1; Var (y, b)] | [Var (y, b); Int 1])] -> Atom (Le, [Var (x, a); Var (y, b)]) end (* Unit boundary simplification: x < y+1 -> x<=y *)
+    | Le -> 
+      begin match tt' with [Var (x, a); Sub ([Var (y, b); Int 1])] -> Atom (Lt, [Var (x, a); Var (y, b)]) end (* Unit boundary simplification: x <= y-1 -> x<y *)
+    end
+  | _ -> p
 
 (* Normalize associativity for And and Or nodes *)
 let rec normalize_associativity (p: SHpure.t) : SHpure.t =
@@ -84,7 +158,8 @@ let rec normalize_associativity (p: SHpure.t) : SHpure.t =
       in
       Or flattened
   | Neg f -> Neg (normalize_associativity f)  (* Normalize within negation *)
-  | _ -> p  (* Atoms, True, False are already normalized *)
+  | Atom (_, _) -> preprocess_and_eval_atom p
+  | _ -> p  (* True, False are already normalized *)
 
 
 (* Convert arbitrary formula to DNF *)
@@ -139,6 +214,6 @@ let simplify_pure (p : SHpure.t) (_stats : bool) : SHpure.t =
   match dnf_p with
   | Or clauses -> Or (List.map (fun clause -> process_conjunctions clause _stats) clauses)
   | And _ -> process_conjunctions dnf_p _stats
-  | _ -> dnf_p
+  | _ -> dnf_p 
   
 ;;
