@@ -1,0 +1,13 @@
+// Syntax
+// (term)      t := <string>('@'<string>)* | '#'<string>'@'<string> | <int> | t '+' t | t '-' t | t '+-' t | t '*' t | t '%' <int> | <string>'(' t* ')' | t 'band' t | t 'bor' t | t 'bxor' t | t '<<' t | t '>>' t
+// (pure atom) p := t '=' t | t "<>" t | t '<' t | t "<=" t | t '>' t | t ">=" t | "True" | "False" | (P)
+// (pure)      P := p | P '&' P | P '|' P | "AllInt" <string>(',' <string>)* P | "ExInt" <string>(',' <string>)* P | "AllNat" <string>(',' <string>)* P | "ExNat" <string>(',' <string>)* P 
+// (fieldterm) f := t | <string> ':' t
+// (spat atom) s := "Emp" | t "-> '(' f* ')' | "Arr" '(' t ',' t ')' | "Str" '(' t ',' t ')'
+// (spat)      S := s | S '*' S
+// (symb.heap) H := P "&&" S
+
+x=0 & x+5 < 2 & 0+5 < 2
+&&
+Emp
+
