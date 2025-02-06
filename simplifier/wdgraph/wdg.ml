@@ -95,6 +95,9 @@ module WDGraph = struct
     let module Path = Path.Check(G) in
     let pc = Path.create(g.graph) in 
     List.exists (fun (u, v) -> Path.check_path pc v u) g.red_edges
+  
+  (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
+  let preprocess_and_eval_atom (a : SHpure.t) : SHpure.t = a (* #FIXME:Missing implementation *)
 
   (* Postprocess an Atom s.t. its terms are minimal *)
   let rec postprocess_and_eval_terms (g : t) (a : Slsyntax.SHterm.t) : Slsyntax.SHterm.t =
