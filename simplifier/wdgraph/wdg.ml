@@ -209,7 +209,7 @@ module WDGraph = struct
                 add_quotient_edge g r_u r_v w) 
             g.graph;
             (* clean expresions in nodes *)
-            G.map_vertex(fun u -> postprocess_and_eval_terms g u) g.quotient_graph
+            g.quotient_graph <- G.map_vertex(fun u -> postprocess_and_eval_terms g u) g.quotient_graph
   
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
   let get_conjunctions (g : t) : SHpure.t list = 
