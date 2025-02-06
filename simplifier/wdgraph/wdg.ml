@@ -115,18 +115,18 @@ module WDGraph = struct
     | Int _ -> a
     | PosInf -> a
     | NegInf -> a
-    | Add ts -> Add (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms t) ts)
-    | Sub ts -> Sub (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms t) ts)
-    | Mul (t0, t1) -> try Mul (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Mul (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Div (t0, t1) -> try Div (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Div (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Mod (t0, t1) -> try Mod (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Mod (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Shr (t0, t1) -> try Shr (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shr (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Shl (t0, t1) -> try Shl (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shl (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Band (t0, t1) -> try Band (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Band (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Bor (t0, t1) -> try Bor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bor (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Bxor (t0, t1) -> try Bxor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bxor (postprocess_and_eval_terms t0, postprocess_and_eval_terms t1)
-    | Bnot t ->  try Bnot (r_scc (f_scc t)) with Not_found -> Bnot (postprocess_and_eval_terms t)
-    | Fcall (f, ts) -> Fcall (f, (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms t) ts))
+    | Add ts -> Add (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t) ts)
+    | Sub ts -> Sub (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t) ts)
+    | Mul (t0, t1) -> begin try Mul (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Mul (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Div (t0, t1) -> begin try Div (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Div (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Mod (t0, t1) -> begin try Mod (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Mod (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Shr (t0, t1) -> begin try Shr (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shr (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Shl (t0, t1) -> begin try Shl (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shl (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Band (t0, t1) -> begin try Band (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Band (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Bor (t0, t1) -> begin try Bor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bor (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Bxor (t0, t1) -> begin try Bxor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bxor (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
+    | Bnot t -> begin try Bnot (r_scc (f_scc t)) with Not_found -> Bnot (postprocess_and_eval_terms g t) end 
+    | Fcall (f, ts) -> begin Fcall (f, (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t) ts)) end
     (* eval them and reduce integers *)
   
   (* Given a list of Atoms (conjunction of them) extract the terms and type of edge and add it to the graph *)
@@ -207,9 +207,9 @@ module WDGraph = struct
                let r_v = r_scc (f_scc v) in
                if r_u <> r_v then  (* avoid redundant edges within the same SCC *)
                 add_quotient_edge g r_u r_v w) 
-            g.graph
+            g.graph;
             (* clean expresions in nodes *)
-            G.map_vertex(fun u -> postprocess_and_eval_terms u) g.quotient_graph
+            G.map_vertex(fun u -> postprocess_and_eval_terms g u) g.quotient_graph
   
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
   let get_conjunctions (g : t) : SHpure.t list = 
