@@ -99,6 +99,11 @@ module WDGraph = struct
   (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
   let preprocess_and_eval_atom (a : SHpure.t) : SHpure.t = a (* #FIXME:Missing implementation *)
 
+  (*let eval_sum_dif (a : SHpure.t) : SHpure.t = 
+    match a with 
+    |Add tt -> let [tt_i; tt_v] = List.partition(fun e -> e == Int _) tt in let sum = List.fold_left(fun e, acc -> e+acc) tt_i 0 in Add(tt_v :: [Int sum])
+    |Sub tt -> let [tt_i; tt_v] = List.partition(fun e -> e == Int _) tt in let sum = List.fold_left(fun e, acc -> e+acc) tt_i 0 in Sub(tt_v :: [Int sum])
+    |_ -> a*)
   (* Postprocess an Atom s.t. its terms are minimal *)
   let rec postprocess_and_eval_terms (g : t) (a : Slsyntax.SHterm.t) : Slsyntax.SHterm.t =
     (* on complex epesion try to recursively match terms into representative method until u find one and stop *)
@@ -115,17 +120,17 @@ module WDGraph = struct
     | Int _ -> a
     | PosInf -> a
     | NegInf -> a
-    | Add ts -> Add (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t) ts)
-    | Sub ts -> Sub (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t) ts)
-    | Mul (t0, t1) -> begin try Mul (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Mul (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Div (t0, t1) -> begin try Div (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Div (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Mod (t0, t1) -> begin try Mod (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Mod (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Shr (t0, t1) -> begin try Shr (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shr (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Shl (t0, t1) -> begin try Shl (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Shl (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Band (t0, t1) -> begin try Band (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Band (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Bor (t0, t1) -> begin try Bor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bor (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Bxor (t0, t1) -> begin try Bxor (r_scc (f_scc t0), r_scc (f_scc t1)) with Not_found -> Bxor (postprocess_and_eval_terms g t0, postprocess_and_eval_terms g t1) end
-    | Bnot t -> begin try Bnot (r_scc (f_scc t)) with Not_found -> Bnot (postprocess_and_eval_terms g t) end 
+    | Add tt -> let tt' = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)tt in begin match tt' with |[Int a; Int b] -> Int (a+b) |_ -> Add(tt') end 
+    | Sub tt -> let tt' = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)tt in begin match tt' with |[Int a; Int b] -> Int (a-b) |_ -> Sub(tt') end 
+    | Mul (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a*b) |_ -> Mul(List.nth tt 0, List.nth tt 1) end (* If two ints then eval, else return atom *)
+    | Div (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a/b) |_ -> Div(List.nth tt 0, List.nth tt 1) end 
+    | Mod (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a mod b) |_ -> Mod(List.nth tt 0, List.nth tt 1) end
+    | Shr (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a lsr b) |_ -> Shr(List.nth tt 0, List.nth tt 1) end
+    | Shl (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a lsl b) |_ -> Shl(List.nth tt 0, List.nth tt 1) end
+    | Band (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a land b) |_ -> Band(List.nth tt 0, List.nth tt 1) end
+    | Bor (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a lor b) |_ -> Bor(List.nth tt 0, List.nth tt 1) end
+    | Bxor (t0, t1) -> let tt = List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t)[t0;t1] in begin match tt with |[Int a; Int b] -> Int (a lxor b) |_ -> Bxor(List.nth tt 0, List.nth tt 1) end
+    | Bnot t -> begin try Bnot (r_scc (f_scc t)) with Not_found -> Bnot (postprocess_and_eval_terms g t) end
     | Fcall (f, ts) -> begin Fcall (f, (List.map(fun t -> try r_scc (f_scc t) with Not_found -> postprocess_and_eval_terms g t) ts)) end
     (* eval them and reduce integers *)
   
@@ -226,5 +231,30 @@ module WDGraph = struct
       let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> SHpure.Atom(Neq, [u; v]) :: acc ) g.black_edges [] in
       let eq_atoms = List.map(fun (u, v) -> SHpure.Atom(Eq, [u; v])) g.eq_representative_pairs in
       eq_atoms@rb_atoms@black_atoms
+
+  let get_conjunctions_eval_atom (g : t) : SHpure.t list = 
+    let eval_atom a = 
+      match a with
+      |SHpure.Atom(Le, [Int x; Int y]) -> if x <= y then SHpure.True else SHpure.False
+      |SHpure.Atom(Lt, [Int x; Int y]) -> if x < y then SHpure.True else SHpure.False
+      |SHpure.Atom(Neq, [Int x; Int y]) -> if x != y then SHpure.True else SHpure.False
+      |SHpure.Atom(Eq, [Int x; Int y]) -> if x == y then SHpure.True else SHpure.False
+      |_ -> a
+    in
+    if g.unsat then 
+      [False]
+    else 
+      let rb_atoms = 
+      G.fold_edges_e (fun (u, w, v) acc -> 
+        match w with
+        | 0 -> eval_atom(SHpure.Atom(Lt, [u; v])) :: acc
+        | 1 -> eval_atom(SHpure.Atom(Le, [u; v])) :: acc
+        | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
+      ) g.quotient_graph [] in
+      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> eval_atom(SHpure.Atom(Neq, [u; v])) :: acc ) g.black_edges [] in
+      let eq_atoms = List.map(fun (u, v) -> eval_atom(SHpure.Atom(Eq, [u; v]))) g.eq_representative_pairs in
+      let red_atoms = eq_atoms@rb_atoms@black_atoms in
+      if List.exists(fun e -> e == SHpure.False) red_atoms then [False] 
+      else List.filter(fun e -> e != SHpure.True) red_atoms
 end
 
