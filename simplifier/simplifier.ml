@@ -194,7 +194,7 @@ let process_conjunctions (p : SHpure.t) (_stats : bool) : SHpure.t =
         Printf.printf "Execution time simplify graph: %f seconds\n" elapsed_time_simplify;
 
       let start_time_rebuild = Unix.gettimeofday () in
-      let simplified_conjunctions = WDGraph.get_conjunctions g in 
+      let simplified_conjunctions = WDGraph.get_conjunctions_eval_atom g in 
       let end_time_rebuild = Unix.gettimeofday () in
       let elapsed_time_rebuild = end_time_rebuild -. start_time_rebuild in
       if _stats then
