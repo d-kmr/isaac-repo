@@ -32,6 +32,8 @@ let rec push_negations (p: SHpure.t) : SHpure.t =
   | True -> p
   | False -> p
   | Atom _ -> p
+  | Neg (True) -> False
+  | Neg (False) -> True
   | Neg (Atom _ as l) -> SHpure.dual l
   | Neg (Neg f) -> push_negations f  (* Double negation elimination *)
   | Neg (And clauses) ->
@@ -135,9 +137,9 @@ let rec preprocess_and_eval_atom (p : Slsyntax.SHpure.t) : Slsyntax.SHpure.t =
     let tt' = [filter_identities_and_eval t0; filter_identities_and_eval t1] in
     begin match op with 
     | Lt -> 
-      begin match tt' with |[Var (x, a); Add ([Int 1; Var (y, b)] | [Var (y, b); Int 1])] -> Atom (Le, [Var (x, a); Var (y, b)]) |_ -> p  end (* Unit boundary simplification: x < y+1 -> x<=y *)
+      begin match tt' with |[a; Add ([Int 1; b] | [b; Int 1])] -> remove_mirror_terms (Atom (Le, [a;b])) |_ -> remove_mirror_terms p  end (* Unit boundary simplification: x < y+1 -> x<=y *)
     | Le -> 
-      begin match tt' with |[Var (x, a); Sub ([Var (y, b); Int 1])] -> Atom (Lt, [Var (x, a); Var (y, b)]) |_ -> p end (* Unit boundary simplification: x <= y-1 -> x<y *)
+      begin match tt' with |[a; Sub ([b; Int 1])] -> remove_mirror_terms (Atom (Lt, [a; b])) |_ -> remove_mirror_terms p end (* Unit boundary simplification: x <= y-1 -> x<y *)
     |_ -> p
     end
   | _ -> remove_mirror_terms p
@@ -187,26 +189,26 @@ let process_conjunctions (p : SHpure.t) (_stats : bool) (_postprocess: bool) : S
   | And conjunctions ->
       let g = WDGraph.create () in
 
-      let start_time_build = Unix.gettimeofday () in
+      (*let start_time_build = Unix.gettimeofday () in*)
       let _ = WDGraph.add_conjunctions g conjunctions in 
-      let end_time_build = Unix.gettimeofday () in
+      (*let end_time_build = Unix.gettimeofday () in
       let elapsed_time_build = end_time_build -. start_time_build in
       if _stats then
-        Printf.printf "Execution time build graph: %f seconds\n" elapsed_time_build;
+        Printf.printf "Execution time build graph: %f seconds\n" elapsed_time_build;*)
       
-      let start_time_simplify = Unix.gettimeofday () in
+      (*let start_time_simplify = Unix.gettimeofday () in*)
       let _ = WDGraph.simplify g in 
-      let end_time_simplify = Unix.gettimeofday () in
+      (*let end_time_simplify = Unix.gettimeofday () in
       let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
       if _stats then
-        Printf.printf "Execution time simplify graph: %f seconds\n" elapsed_time_simplify;
+        Printf.printf "Execution time simplify graph: %f seconds\n" elapsed_time_simplify;*)
 
-      let start_time_rebuild = Unix.gettimeofday () in
+      (*let start_time_rebuild = Unix.gettimeofday () in*)
       let simplified_conjunctions = if _postprocess then WDGraph.get_conjunctions_eval_atom g else WDGraph.get_conjunctions g in 
-      let end_time_rebuild = Unix.gettimeofday () in
+      (*let end_time_rebuild = Unix.gettimeofday () in
       let elapsed_time_rebuild = end_time_rebuild -. start_time_rebuild in
       if _stats then
-        Printf.printf "Execution time re-build graph: %f seconds\n" elapsed_time_rebuild;
+        Printf.printf "Execution time re-build graph: %f seconds\n" elapsed_time_rebuild;*)
 
       begin match simplified_conjunctions with
       | [False] -> False
@@ -218,17 +220,49 @@ let process_conjunctions (p : SHpure.t) (_stats : bool) (_postprocess: bool) : S
 let rec process_disjunction (p : SHpure.t list) : SHpure.t list = 
   List.filter(fun p' -> p' <> SHpure.False) p
 
+let rec dnf_atom_size (p: SHpure.t) : int = 
+  match p with 
+  | False | True | Atom(_) -> 1
+  | And pp -> List.length pp
+  | Or pp -> pp |> List.map(fun e -> dnf_atom_size e) |> List.fold_left(fun e acc -> e + acc) 0
 (* Currently do nothing *)
 let simplify_pure (p : SHpure.t) (_stats : bool) (_preprocess: bool) (_postprocess: bool) : SHpure.t =
   let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
   let end_time_dnf = Unix.gettimeofday () in
   let elapsed_time_dnf = end_time_dnf -. start_time_dnf in
-  if _stats then
+  if _stats then 
     Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
   match dnf_p with
-  | Or clauses -> Or (process_disjunction(List.map (fun clause -> process_conjunctions clause _stats _postprocess) clauses))
-  | And _ -> process_conjunctions dnf_p _stats _postprocess
-  | _ -> dnf_p 
+  | Or clauses -> 
+    let start_time_simplify = Unix.gettimeofday () in
+    let red_dnf_p = SHpure.Or (process_disjunction(List.map (fun clause -> process_conjunctions clause _stats _postprocess) clauses)) in
+    let end_time_simplify = Unix.gettimeofday () in
+    let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
+    if _stats then 
+      Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
+      Printf.printf "Size of DNF formulae (atoms): %d\n" (dnf_atom_size dnf_p);
+      Printf.printf "Size of reduced formulae (atoms): %d\n" (dnf_atom_size red_dnf_p);
+    red_dnf_p
+  | And _ -> 
+    let start_time_simplify = Unix.gettimeofday () in
+    let red_dnf_p = process_conjunctions dnf_p _stats _postprocess in 
+    let end_time_simplify = Unix.gettimeofday () in
+    let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
+    if _stats then 
+      Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
+      Printf.printf "Size of DNF formulae (atoms): %d\n" (dnf_atom_size dnf_p);
+      Printf.printf "Size of reduced formulae (atoms): %d\n" (dnf_atom_size red_dnf_p);
+    red_dnf_p
+  | _ -> 
+    let eval_atom a = 
+      match a with
+      |SHpure.Atom(Le, [Int x; Int y]) -> if x <= y then SHpure.True else SHpure.False
+      |SHpure.Atom(Lt, [Int x; Int y]) -> if x < y then SHpure.True else SHpure.False
+      |SHpure.Atom(Neq, [Int x; Int y]) -> if x != y then SHpure.True else SHpure.False
+      |SHpure.Atom(Eq, [Int x; Int y]) -> if x == y then SHpure.True else SHpure.False
+      |_ -> a
+    in
+    eval_atom dnf_p 
   
 ;;
