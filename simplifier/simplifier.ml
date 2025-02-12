@@ -117,9 +117,7 @@ let rec remove_mirror_terms (e :Slsyntax.SHpure.t) : Slsyntax.SHpure.t =
     | _ -> T.Add tt
   in
   let rec aux tt uu =
-    match tt,uu with
-    | t0::tt0,u0::uu0 when t0 = u0 -> aux tt0 uu0
-    | _,_ -> (fromList tt,fromList uu)
+    fromList (List.filter (fun x -> not (List.exists ((=) x) uu)) tt), fromList (List.filter (fun x -> not (List.exists ((=) x) tt)) uu)
   in
   match e with
   |Atom(Le, [t;u]) -> let tt, uu = aux (toList t) (toList u) in Atom(Le, [filter_identities_and_eval tt; filter_identities_and_eval uu])
