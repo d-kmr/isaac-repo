@@ -140,6 +140,7 @@ module WDGraph = struct
         if not (g.unsat) then
           match a with
           | SHpure.False -> g.unsat <- true;
+          | SHpure.True -> ()
           | SHpure.Atom (op, tt) ->
             let a' = preprocess_and_eval_atom a in
             match a' with
@@ -240,7 +241,7 @@ module WDGraph = struct
       |SHpure.Atom(Neq, [Int x; Int y]) -> if x != y then SHpure.True else SHpure.False
       |SHpure.Atom(Eq, [Int x; Int y]) -> if x == y then SHpure.True else SHpure.False
       |_ -> a
-    in
+    in 
     if g.unsat then 
       [False]
     else 
