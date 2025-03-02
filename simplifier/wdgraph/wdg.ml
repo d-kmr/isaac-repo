@@ -41,12 +41,13 @@ module WDGraph = struct
     quotient_graph = G.empty;
   }
 
+  (* Orders a pair of nodes depending of `SHterm.compare` *)
   let normalize_term_pair (u : SHterm.t) (v : SHterm.t) : SHterm.t * SHterm.t  =
     if SHterm.compare u v <= 0 then (u, v) else (v, u)
 
-  (* Add an edge to the graph. #TODO:Maybe can be shortened removing the 3rd if statement *)
+  (* Add an edge to the graph *)
   let add_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : int) : unit =
-    if w = (-1) && u = v then g.unsat <- true; (* Black contradiction *)
+    if w = (-1) && u = v then g.unsat <- true; (* Black contradiction: `x < x` *)
     if not (g.unsat) then
       (* Make sure nodes exist *)
       let g' = G.add_vertex (G.add_vertex g.graph u) v in
@@ -75,6 +76,7 @@ module WDGraph = struct
             g.graph <- g';
             if w = 0 then g.red_edges <- (u, v) :: g.red_edges
 
+  (* Add an edge to the quotient graph *)
   let add_quotient_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : int) : unit =
     if not (g.unsat) then
       try
@@ -90,20 +92,12 @@ module WDGraph = struct
         let g' = G.add_edge_e g.quotient_graph (u, w, v) in
         g.quotient_graph <- g'
 
-  (* Check if any of the red edges forms a cycle *)
+  (* Check if any of the red edges forms a cycle. Red contradiction *)
   let forms_cycle_with_red (g : t) : bool =
     let module Path = Path.Check(G) in
     let pc = Path.create(g.graph) in 
     List.exists (fun (u, v) -> Path.check_path pc v u) g.red_edges
-  
-  (* Preprocess an Atom s.t. its terms are minimal, i.e. reducing and evaluating all possible exoresions. #TODO:This might be better to do it while transforing formula to dnf *)
-  let preprocess_and_eval_atom (a : SHpure.t) : SHpure.t = a (* #FIXME:Missing implementation *)
 
-  (*let eval_sum_dif (a : SHpure.t) : SHpure.t = 
-    match a with 
-    |Add tt -> let [tt_i; tt_v] = List.partition(fun e -> e == Int _) tt in let sum = List.fold_left(fun e, acc -> e+acc) tt_i 0 in Add(tt_v :: [Int sum])
-    |Sub tt -> let [tt_i; tt_v] = List.partition(fun e -> e == Int _) tt in let sum = List.fold_left(fun e, acc -> e+acc) tt_i 0 in Sub(tt_v :: [Int sum])
-    |_ -> a*)
   (* Postprocess an Atom s.t. its terms are minimal *)
   let rec postprocess_and_eval_terms (g : t) (a : Slsyntax.SHterm.t) : Slsyntax.SHterm.t =
     (* on complex epesion try to recursively match terms into representative method until u find one and stop *)
@@ -142,7 +136,7 @@ module WDGraph = struct
           | SHpure.False -> g.unsat <- true;
           | SHpure.True -> ()
           | SHpure.Atom (op, tt) ->
-            let a' = preprocess_and_eval_atom a in
+            let a' =  a in
             match a' with
             | SHpure.Atom (op, tt) ->
               let t0 = List.nth tt 0 in
@@ -171,7 +165,7 @@ module WDGraph = struct
         g.n_scc <- n_scc;
         g.f_scc <- Some f_scc;
         let black_pairs_in_same_scc = Hashtbl.fold (fun (u, v) _ acc -> acc || (f_scc u == f_scc v)) g.black_edges false in
-        if black_pairs_in_same_scc then g.unsat <- true (* Black contradiction 2 *)
+        if black_pairs_in_same_scc then g.unsat <- true (* Black contradiction 2: Inside an SCC there exists 2 nodes that are equivalent and diferent at the same time: `x = y and y != x` *)
         else 
             (* Compute representatives for SCCs *)
             let scc_nodes = Hashtbl.create n_scc in
@@ -233,6 +227,7 @@ module WDGraph = struct
       let eq_atoms = List.map(fun (u, v) -> SHpure.Atom(Eq, [u; v])) g.eq_representative_pairs in
       eq_atoms@rb_atoms@black_atoms
 
+  (* Given a graph extract the terms and type of relation from edge and return a new conjunction list with its terms and atoms evaluated if possible *)
   let get_conjunctions_eval_atom (g : t) : SHpure.t list = 
     let eval_atom a = 
       match a with
