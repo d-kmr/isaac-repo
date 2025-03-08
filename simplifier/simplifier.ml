@@ -218,19 +218,22 @@ let process_conjunctions (p : SHpure.t) (_stats : bool) (_postprocess: bool) : S
 let rec process_disjunction (p : SHpure.t list) : SHpure.t list = 
   List.filter(fun p' -> p' <> SHpure.False) p
 
-let rec dnf_atom_size (p: SHpure.t) : int = 
+let rec shpure_atom_size (p: SHpure.t) : int = 
   match p with 
   | False | True | Atom(_) -> 1
-  | And pp -> List.length pp
-  | Or pp -> pp |> List.map(fun e -> dnf_atom_size e) |> List.fold_left(fun e acc -> e + acc) 0
-(* Currently do nothing *)
+  | And pp | Or pp -> pp |> List.map(fun e -> dnf_atom_size e) |> List.fold_left(fun e acc -> e + acc) 0
+  | Imp (a, b) -> (dnf_atom_size a) + (dnf_atom_size b)
+
+  (* Currently do nothing *)
 let simplify_pure (p : SHpure.t) (_stats : bool) (_preprocess: bool) (_postprocess: bool) : SHpure.t =
   let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
   let end_time_dnf = Unix.gettimeofday () in
   let elapsed_time_dnf = end_time_dnf -. start_time_dnf in
   if _stats then 
+    Printf.printf "Size of Original formulae (atoms): %d\n" (shpure_atom_size p);
     Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
+    Printf.printf "Size of DNF formulae (atoms): %d\n" (shpure_atom_size dnf_p);
   match dnf_p with
   | Or clauses -> 
     let start_time_simplify = Unix.gettimeofday () in
@@ -239,8 +242,7 @@ let simplify_pure (p : SHpure.t) (_stats : bool) (_preprocess: bool) (_postproce
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     if _stats then 
       Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-      Printf.printf "Size of DNF formulae (atoms): %d\n" (dnf_atom_size dnf_p);
-      Printf.printf "Size of reduced formulae (atoms): %d\n" (dnf_atom_size red_dnf_p);
+      Printf.printf "Size of reduced formulae (atoms): %d\n" (shpure_atom_size red_dnf_p);
     red_dnf_p
   | And _ -> 
     let start_time_simplify = Unix.gettimeofday () in
@@ -249,8 +251,7 @@ let simplify_pure (p : SHpure.t) (_stats : bool) (_preprocess: bool) (_postproce
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     if _stats then 
       Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-      Printf.printf "Size of DNF formulae (atoms): %d\n" (dnf_atom_size dnf_p);
-      Printf.printf "Size of reduced formulae (atoms): %d\n" (dnf_atom_size red_dnf_p);
+      Printf.printf "Size of reduced formulae (atoms): %d\n" (shpure_atom_size red_dnf_p);
     red_dnf_p
   | _ -> 
     let eval_atom a = 
@@ -263,4 +264,5 @@ let simplify_pure (p : SHpure.t) (_stats : bool) (_preprocess: bool) (_postproce
     in
     eval_atom dnf_p 
   
+  (*let simplify_spatial (p : SHspat.t) (_stats : bool) (_preprocess: bool) (_postprocess: bool) : SHspat.t = *)
 ;;
