@@ -1,6 +1,11 @@
 open Graph
 open Slsyntax
 
+module NodeSet = Set.Make(struct
+  type t = SHterm.t
+  let compare = SHterm.compare
+end)
+
 (* Define the graph module using OCamlgraph's Persistent.Digraph.ConcreteLabeled functor *)
 module WDGraph = struct
   (* Define a custom graph with integer nodes and edges labeled with weights *)
@@ -174,7 +179,7 @@ module WDGraph = struct
             let representatives = Array.make n_scc (SHterm.Int 0) (* Placeholder initial value *) in
             for i = 0 to n_scc - 1 do
               let nodes = Hashtbl.find_all scc_nodes i in
-              let int_terms = List.filter (function SHterm.Int _ -> true | _ -> false) nodes in
+              let int_terms = List.filter (function SHterm.Int _ -> true | SHterm.Sub [Int _; Int _] -> true | _ -> false) nodes in  (* SHterm.Sub [Int a; Int b] refers to negative numbers that are stored as 0-n *)
               let chosen_rep = 
                 begin match int_terms with
                 | [a] -> Array.set representatives i a; a (* Exactly one Int term *)
@@ -240,7 +245,7 @@ module WDGraph = struct
     if g.unsat then 
       [False]
     else 
-      let rb_atoms = 
+      let rb_atoms =
       G.fold_edges_e (fun (u, w, v) acc -> 
         match w with
         | 0 -> eval_atom(SHpure.Atom(Lt, [u; v])) :: acc
@@ -252,5 +257,74 @@ module WDGraph = struct
       let red_atoms = eq_atoms@rb_atoms@black_atoms in
       if List.exists(fun e -> e == SHpure.False) red_atoms then [False] 
       else List.filter(fun e -> e != SHpure.True) red_atoms
-end
 
+  
+  let is_inconsistent_pto_spat (g : t) (ptr_spat : SHterm.t list) : bool =
+  (* Check address positive not null: representative or relations *)
+  let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+  let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+  let has_duplicated_or_neg_address =
+    let rec check seen = function
+      | [] -> false
+      | x :: xs ->
+        match (try Some (r_scc (f_scc x)) with _ -> None) with
+        | None -> check seen xs 
+        | Some representative ->
+          match representative with
+          | Int i when i <= 0 -> true
+          | Sub [Int a; Int b] when a-b <=0 -> true
+          | _ -> if Hashtbl.mem seen representative then true 
+          else (
+            Hashtbl.add seen representative ();
+            check seen xs
+          )    
+    in
+    let seen = Hashtbl.create (List.length ptr_spat) in
+    check seen ptr_spat in
+  has_duplicated_or_neg_address
+  let is_inconsistent_mem_spat (g : t) (mem_spat : (SHterm.t * SHterm.t) list) : bool =
+    let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+    let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+    let early_termination = ref false in
+    let filtered_mem_spat = List.filter_map(fun (a,b) -> 
+      match (try Some (r_scc (f_scc a)) with _ -> None) with
+      | None -> None 
+      | Some r_a -> match r_a with 
+        | Int i when i <= 0 -> early_termination := true; None
+        | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
+        | _ -> match (try Some (r_scc (f_scc b)) with _ -> None) with
+          | None -> None 
+          | Some r_b -> match r_b with
+            | Int i when i <= 0 -> early_termination := true; None
+            | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
+            | _ -> Some (r_a, r_b)
+      ) mem_spat in (* The pairs of nodes we do not have in the graph we skip them (no information) *)
+    if !early_termination then true else (
+    (* Function to compute nodes in all paths *)
+    let nodes_in_all_paths a b =
+      (* 1. Compute nodes reachable from A (forward reachability) *)
+      let forward_reachable_nodes = G.fold_succ (fun x acc -> NodeSet.add x acc) g.quotient_graph a (NodeSet.add a NodeSet.empty) in
+      (* 2. Compute nodes that can reach B (backward reachability) *)
+      let backward_reachable_nodes = G.fold_pred (fun x acc -> NodeSet.add x acc) g.quotient_graph b (NodeSet.add b NodeSet.empty) in
+      
+      (* 3. Intersection of forward and backward reachable nodes *)
+      NodeSet.inter forward_reachable_nodes backward_reachable_nodes 
+    in
+    let l =  List.length filtered_mem_spat in
+    (*List.iter(fun (a, b) -> SHterm.print a; SHterm.print b) filtered_mem_spat;*)
+    let segment_intervals = List.map (fun (a, b) -> nodes_in_all_paths a b) filtered_mem_spat in
+    let seen = Hashtbl.create 32 in
+      try
+        List.iter (fun set ->
+          NodeSet.iter (fun elt ->
+            if Hashtbl.mem seen elt then
+              raise Exit (* Duplicate found *)
+            else
+              Hashtbl.add seen elt ()
+          ) set
+        ) segment_intervals;
+        false (* No duplicates found *)
+      with
+      | Exit -> true (* Duplicate found *)
+    )
+end

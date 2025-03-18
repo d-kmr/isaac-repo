@@ -2014,7 +2014,15 @@ module SHspatExp = struct
 
   let getStringSeg (s : t) = match s with
     | Str(t1,t2) -> [(t1,t2)]
-    | _ -> []      
+    | _ -> []
+
+  let getMemSeg (s : t) = match s with
+    | Str(t1,t2) | Arr(t1,t2) -> [(t1,t2)]
+    | _ -> []
+    
+  let getPtoSeg (s : t) = match s with
+    | Pto(t, _) -> [t]
+    | _ -> []
 
   let mkInterval (s : t) = match s with
     | Pto(t,_) -> (t,t)
@@ -2231,6 +2239,12 @@ module SHspat = struct
 
   let getStringSeg (ss : t) = 
     List.concat (List.map SHspatExp.getStringSeg ss)
+
+  let getMemSeg (ss : t) =
+    List.concat (List.map SHspatExp.getMemSeg ss)
+  
+  let getPtoSeg (ss : t) =
+    List.concat (List.map SHspatExp.getPtoSeg ss)
 
   let mkSegment (ss : t) = List.map S.mkInterval ss
     

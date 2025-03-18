@@ -181,37 +181,29 @@ let to_dnf (p: SHpure.t) : SHpure.t =
   (*|> SHpure.syntactical_simplL   (* Simplify resulting formula *)
   |> SHpure.extinguish_phantoms  (* Remove phantom variables *)*)
 
-let process_conjunctions (p : SHpure.t) (_stats : bool) (_postprocess: bool) : SHpure.t =
+
+let eval_atom (a : SHpure.t) : SHpure.t = 
+  match a with
+  |Atom(Le, [Int x; Int y]) -> if x > y then False else a
+  |Atom(Lt, [Int x; Int y]) -> if x >= y then False else a
+  |Atom(Neq, [Int x; Int y]) -> if not (x != y) then False else a
+  |Atom(Eq, [Int x; Int y]) -> if x != y then False else a
+  |_ -> a
+
+let process_conjunctions (p : SHpure.t) (ptr_spat : SHterm.t list) (mem_spat : (SHterm.t * SHterm.t) list) : SHpure.t =
   match p with
-  | Atom (_, _) -> p
+  | Atom (_, _) -> eval_atom p (* #TODO: Check spatial for only one atom too, with one atom we just need to check address is not null positive *)
   | And conjunctions ->
       let g = WDGraph.create () in
-
-      (*let start_time_build = Unix.gettimeofday () in*)
       let _ = WDGraph.add_conjunctions g conjunctions in 
-      (*let end_time_build = Unix.gettimeofday () in
-      let elapsed_time_build = end_time_build -. start_time_build in
-      if _stats then
-        Printf.printf "Execution time build graph: %f seconds\n" elapsed_time_build;*)
-      
-      (*let start_time_simplify = Unix.gettimeofday () in*)
       let _ = WDGraph.simplify g in 
-      (*let end_time_simplify = Unix.gettimeofday () in
-      let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
-      if _stats then
-        Printf.printf "Execution time simplify graph: %f seconds\n" elapsed_time_simplify;*)
-
-      (*let start_time_rebuild = Unix.gettimeofday () in*)
-      let simplified_conjunctions = if _postprocess then WDGraph.get_conjunctions_eval_atom g else WDGraph.get_conjunctions g in 
-      (*let end_time_rebuild = Unix.gettimeofday () in
-      let elapsed_time_rebuild = end_time_rebuild -. start_time_rebuild in
-      if _stats then
-        Printf.printf "Execution time re-build graph: %f seconds\n" elapsed_time_rebuild;*)
-
-      begin match simplified_conjunctions with
-      | [False] -> False
-      | _ -> And simplified_conjunctions
-      end
+      if (WDGraph.is_inconsistent_pto_spat g ptr_spat) || (WDGraph.is_inconsistent_mem_spat g mem_spat) then False
+      else
+        let simplified_conjunctions = WDGraph.get_conjunctions_eval_atom g in (* WDGraph.get_conjunctions g in  #TODO: Remove this if we end up not using it *)
+        begin match simplified_conjunctions with
+        | [False] -> False
+        | _ -> And simplified_conjunctions
+        end
   | _ -> failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
 
 (* Currently just filtering falses *)
@@ -221,48 +213,42 @@ let rec process_disjunction (p : SHpure.t list) : SHpure.t list =
 let rec shpure_atom_size (p: SHpure.t) : int = 
   match p with 
   | False | True | Atom(_) -> 1
-  | And pp | Or pp -> pp |> List.map(fun e -> dnf_atom_size e) |> List.fold_left(fun e acc -> e + acc) 0
-  | Imp (a, b) -> (dnf_atom_size a) + (dnf_atom_size b)
+  | And pp | Or pp -> pp |> List.map(fun e -> shpure_atom_size e) |> List.fold_left(fun e acc -> e + acc) 0
+  | Imp (a, b) -> (shpure_atom_size a) + (shpure_atom_size b)
 
-  (* Currently do nothing *)
-let simplify_pure (p : SHpure.t) (_stats : bool) (_preprocess: bool) (_postprocess: bool) : SHpure.t =
+let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : SHpure.t =
   let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
+  let ptr_spat = SHspat.getPtoSeg ss in
+  let mem_spat = SHspat.getMemSeg ss in (* Arr + Str *)
   let end_time_dnf = Unix.gettimeofday () in
   let elapsed_time_dnf = end_time_dnf -. start_time_dnf in
-  if _stats then 
-    Printf.printf "Size of Original formulae (atoms): %d\n" (shpure_atom_size p);
-    Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
-    Printf.printf "Size of DNF formulae (atoms): %d\n" (shpure_atom_size dnf_p);
+
+  if _stats then Printf.printf "\nSize of Original formulae (atoms): %d\n" (shpure_atom_size p);
+  if _stats then Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
+  if _stats then Printf.printf "Size of DNF formulae (atoms): %d\n" (shpure_atom_size dnf_p);
+
   match dnf_p with
   | Or clauses -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = SHpure.Or (process_disjunction(List.map (fun clause -> process_conjunctions clause _stats _postprocess) clauses)) in
+    let red_dnf_p = SHpure.Or (process_disjunction(List.map (fun clause -> process_conjunctions clause ptr_spat mem_spat) clauses)) in
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
-    if _stats then 
-      Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-      Printf.printf "Size of reduced formulae (atoms): %d\n" (shpure_atom_size red_dnf_p);
+    
+    if _stats then Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
+    if _stats then  Printf.printf "Size of reduced formulae (atoms): %d\n\n" (shpure_atom_size red_dnf_p);
+
     red_dnf_p
   | And _ -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = process_conjunctions dnf_p _stats _postprocess in 
+    let red_dnf_p = process_conjunctions dnf_p ptr_spat mem_spat in 
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
-    if _stats then 
-      Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-      Printf.printf "Size of reduced formulae (atoms): %d\n" (shpure_atom_size red_dnf_p);
+    
+    if _stats then Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
+    if _stats then Printf.printf "Size of reduced formulae (atoms): %d\n\n" (shpure_atom_size red_dnf_p);
+
     red_dnf_p
-  | _ -> 
-    let eval_atom a = 
-      match a with
-      |SHpure.Atom(Le, [Int x; Int y]) -> if x <= y then SHpure.True else SHpure.False
-      |SHpure.Atom(Lt, [Int x; Int y]) -> if x < y then SHpure.True else SHpure.False
-      |SHpure.Atom(Neq, [Int x; Int y]) -> if x != y then SHpure.True else SHpure.False
-      |SHpure.Atom(Eq, [Int x; Int y]) -> if x == y then SHpure.True else SHpure.False
-      |_ -> a
-    in
-    eval_atom dnf_p 
+  | _ -> eval_atom dnf_p 
   
-  (*let simplify_spatial (p : SHspat.t) (_stats : bool) (_preprocess: bool) (_postprocess: bool) : SHspat.t = *)
 ;;
