@@ -2023,6 +2023,10 @@ module SHspatExp = struct
   let getPtoSeg (s : t) = match s with
     | Pto(t, _) -> [t]
     | _ -> []
+  
+  let getPtrSeg (s : t) = match s with
+    | Pto(t1, t2) -> [(t1, t2)]
+    | _ -> []
 
   let mkInterval (s : t) = match s with
     | Pto(t,_) -> (t,t)
@@ -2245,6 +2249,9 @@ module SHspat = struct
   
   let getPtoSeg (ss : t) =
     List.concat (List.map SHspatExp.getPtoSeg ss)
+  
+  let getPtrSeg (ss : t) =
+    List.concat (List.map SHspatExp.getPtrSeg ss)
 
   let mkSegment (ss : t) = List.map S.mkInterval ss
     

@@ -87,12 +87,14 @@ module WDGraph = struct
       try
         let edge = G.find_edge g.quotient_graph u v in
         match edge with
-        | (_,w',_) ->
+        | (_,w',_) when w' >= 0 ->
           if w <> w' then
             (* Update the weight to 0 if the weights differ *)
             let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
             let g' = G.add_edge_e g' (u, 0, v) in
             g.quotient_graph <- g'
+        | _ -> let g' = G.add_edge_e g.quotient_graph (u, w, v) in
+          g.quotient_graph <- g'
       with Not_found -> 
         let g' = G.add_edge_e g.quotient_graph (u, w, v) in
         g.quotient_graph <- g'
@@ -263,6 +265,21 @@ module WDGraph = struct
   (* Check address positive not null: representative or relations *)
   let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
   let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+  let early_termination = ref false in
+  let filtered_pto_spat = List.filter_map(fun (a,b) -> 
+    match (try Some (r_scc (f_scc a)) with _ -> None) with
+    | None -> None 
+    | Some r_a -> match r_a with 
+      | Int i when i <= 0 -> early_termination := true; None
+      | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
+      | _ -> match (try Some (r_scc (f_scc b)) with _ -> None) with
+        | None -> None 
+        | Some r_b -> match r_b with
+          | Int i when i <= 0 -> early_termination := true; None
+          | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
+          | _ -> Some (r_a, r_b)
+    ) mem_spat in (* The pairs of nodes we do not have in the graph we skip them (no information) *)
+  if !early_termination then (g.unsat <- true; g.unsat) else ()
   let has_duplicated_or_neg_address =
     let rec check seen = function
       | [] -> false

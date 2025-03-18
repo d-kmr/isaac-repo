@@ -190,16 +190,16 @@ let eval_atom (a : SHpure.t) : SHpure.t =
   |Atom(Eq, [Int x; Int y]) -> if x != y then False else a
   |_ -> a
 
-let process_conjunctions (p : SHpure.t) (ptr_spat : SHterm.t list) (mem_spat : (SHterm.t * SHterm.t) list) : SHpure.t =
+let process_conjunctions (p : SHpure.t) (ptr_spat : (SHterm.t * SHterm.t) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) : SHpure.t =
   match p with
   | Atom (_, _) -> eval_atom p (* #TODO: Check spatial for only one atom too, with one atom we just need to check address is not null positive *)
   | And conjunctions ->
       let g = WDGraph.create () in
       let _ = WDGraph.add_conjunctions g conjunctions in 
       let _ = WDGraph.simplify g in 
-      if (WDGraph.is_inconsistent_pto_spat g ptr_spat) || (WDGraph.is_inconsistent_mem_spat g mem_spat) then False
-      else
-        let simplified_conjunctions = WDGraph.get_conjunctions_eval_atom g in (* WDGraph.get_conjunctions g in  #TODO: Remove this if we end up not using it *)
+      let _ = WDGraph.add_ptr g ptr_spat in
+      let _ = WDGraph.add_mem_spatt g arr_spat str_spat in
+      let simplified_conjunctions = WDGraph.get_conjunctions_eval_atom g in (* WDGraph.get_conjunctions g in  #TODO: Remove this if we end up not using it *)
         begin match simplified_conjunctions with
         | [False] -> False
         | _ -> And simplified_conjunctions
@@ -219,8 +219,9 @@ let rec shpure_atom_size (p: SHpure.t) : int =
 let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : SHpure.t =
   let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
-  let ptr_spat = SHspat.getPtoSeg ss in
-  let mem_spat = SHspat.getMemSeg ss in (* Arr + Str *)
+  let ptr_spat = SHspat.getPtrSeg ss in
+  let arr_spat = SHspat.getArraySeg ss in 
+  let str_spat = SHspat.getStringSeg ss in 
   let end_time_dnf = Unix.gettimeofday () in
   let elapsed_time_dnf = end_time_dnf -. start_time_dnf in
 
@@ -231,7 +232,7 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : SHpure.t =
   match dnf_p with
   | Or clauses -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = SHpure.Or (process_disjunction(List.map (fun clause -> process_conjunctions clause ptr_spat mem_spat) clauses)) in
+    let red_dnf_p = SHpure.Or (process_disjunction(List.map (fun clause -> process_conjunctions clause ptr_spat arr_spat str_spat) clauses)) in
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     
@@ -241,7 +242,7 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : SHpure.t =
     red_dnf_p
   | And _ -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = process_conjunctions dnf_p ptr_spat mem_spat in 
+    let red_dnf_p = process_conjunctions dnf_p ptr_spat arr_spat str_spat in 
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     
