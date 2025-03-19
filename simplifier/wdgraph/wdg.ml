@@ -11,7 +11,7 @@ module WDGraph = struct
   (* Define a custom graph with integer nodes and edges labeled with weights *)
   module G = Persistent.Digraph.ConcreteLabeled(struct
     type t = Slsyntax.SHterm.t  (*Using terms as nodes*)
-    let compare = compare
+    let compare = SHterm.compare
     let hash = Hashtbl.hash
     let equal = (=)
   end)(struct
@@ -261,25 +261,29 @@ module WDGraph = struct
       else List.filter(fun e -> e != SHpure.True) red_atoms
 
   
+  let add_ptr (g : t) (ptr_spat : (SHterm.t * SHterm.t) list) : unit =
+    let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+    let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+    List.iter(fun (a,b) -> if not (g.unsat) then (
+      let r_a = try r_scc (f_scc a) with | Not_found -> a in
+      let r_b = try r_scc (f_scc b) with | Not_found -> b in
+      match r_a with 
+      | Int i when i <= 0 | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address *)
+      | _ -> (* Add edge *)
+        let g' = G.add_edge_e g.quotient_graph (r_a, (-2), r_b) in (* -2: encoding for pointer edge *) 
+        g.quotient_graph <- g'
+      )) ptr_spat in
+      if not (g.unsat) then (* Check for green (-2) outdegree > 1 *)
+        List.iter(fun (a,_) -> if not (g.unsat) then
+          let r_a = try r_scc (f_scc a) with | Not_found -> a in
+          let green_out = G.succ_e g.quotient_graph r_a |> List.filter (fun (_, _, l) -> l = (-2)) |> List.length in (* -2: encoding for pointer edge *) 
+          if green_out > 1 then g.unsat <- true
+          ) ptr_spat
+  
   let is_inconsistent_pto_spat (g : t) (ptr_spat : SHterm.t list) : bool =
   (* Check address positive not null: representative or relations *)
   let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
   let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
-  let early_termination = ref false in
-  let filtered_pto_spat = List.filter_map(fun (a,b) -> 
-    match (try Some (r_scc (f_scc a)) with _ -> None) with
-    | None -> None 
-    | Some r_a -> match r_a with 
-      | Int i when i <= 0 -> early_termination := true; None
-      | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
-      | _ -> match (try Some (r_scc (f_scc b)) with _ -> None) with
-        | None -> None 
-        | Some r_b -> match r_b with
-          | Int i when i <= 0 -> early_termination := true; None
-          | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
-          | _ -> Some (r_a, r_b)
-    ) mem_spat in (* The pairs of nodes we do not have in the graph we skip them (no information) *)
-  if !early_termination then (g.unsat <- true; g.unsat) else ()
   let has_duplicated_or_neg_address =
     let rec check seen = function
       | [] -> false
@@ -299,6 +303,7 @@ module WDGraph = struct
     let seen = Hashtbl.create (List.length ptr_spat) in
     check seen ptr_spat in
   has_duplicated_or_neg_address
+
   let is_inconsistent_mem_spat (g : t) (mem_spat : (SHterm.t * SHterm.t) list) : bool =
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
     let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
