@@ -2603,6 +2603,32 @@ module QFEntl = struct
 end
 ;;
 
+(* Module of Disjunction of Symbolic Heaps *)  
+module DisjSH = struct
+    
+  type t = (SHpure.t * SHspat.t) list
+
+  let print fmt = function 
+  | [] -> ()
+  | [(shp, shs)] -> 
+    Format.fprintf fmt "@[%a && %a@]" SHpure.pp shp SHspat.pp shs
+  | (shp, shs) :: ps -> 
+    Format.fprintf fmt "@[%a && %a" SHpure.pp shp SHspat.pp shs;
+    List.iter (fun (shp', shs') -> Format.fprintf fmt " | %a && %a" SHpure.pp shp' SHspat.pp shs') ps;
+    Format.fprintf fmt "@]"
+
+  let println fmt = function 
+  | [] -> ()
+  | [(shp, shs)] -> 
+    Format.fprintf fmt "@[%a && %a@." SHpure.pp shp SHspat.pp shs
+  | (shp, shs) :: ps -> 
+    Format.fprintf fmt "@[%a && %a" SHpure.pp shp SHspat.pp shs;
+    List.iter (fun (shp', shs') -> Format.fprintf fmt " | %a && %a" SHpure.pp shp' SHspat.pp shs') ps;
+    Format.fprintf fmt "@."
+
+end
+;;
+
 module SHinterval = struct
   (* 'j' is used *)
   type t = SHterm.t * SHterm.t
