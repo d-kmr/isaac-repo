@@ -285,6 +285,7 @@ module WDGraph = struct
   let add_mem_spat (g : t) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) :  unit = 
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
     let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
+    let mem_spat = arr_spat @ str_spat in 
     List.iter(fun (a,b) -> if not (g.unsat) then (
       let r_a = try r_scc (f_scc a) with | Not_found -> a in
       let r_b = try r_scc (f_scc b) with | Not_found -> b in
@@ -311,15 +312,16 @@ module WDGraph = struct
           | _ -> (* Add edge *)
             let g' = G.add_edge_e g.quotient_graph (r_a, (-4), r_b) in (* -4: encoding for string edge *) 
             g.quotient_graph <- g'
-        )) str_spat;
+      )) str_spat;
     if not (g.unsat) then ( (* Check for no cycles for all pairs array+string *)
       let module Path = Path.Check(G) in
       let pc = Path.create(g.quotient_graph) in 
-      List.iter (fun (a, b) -> if not (g.unsat) then
+      List.iter(fun (a,b) -> if not (g.unsat) then (
         let r_a = try r_scc (f_scc a) with | Not_found -> a in
         let r_b = try r_scc (f_scc b) with | Not_found -> b in
-        if Path.check_path pc r_b r_a then g.unsat <- true) arr_spat::str_spat
-    )
+        if Path.check_path pc r_b r_a then g.unsat <- true)
+      ) mem_spat
+    );
     if not (g.unsat) then ((* Check for overlaps in memory *)
       let nodes_in_all_paths a b =
         (* 1. Compute nodes reachable from A (forward reachability) *)
@@ -330,11 +332,10 @@ module WDGraph = struct
         (* 3. Intersection of forward and backward reachable nodes *)
         NodeSet.inter forward_reachable_nodes backward_reachable_nodes 
       in
-      let used_memory = ref NodeSet in
-      used_memory := NodeSet.empty;
-      let segment_intervals = List.map (fun (a, b) -> nodes_in_all_paths a b) arr_spat::str_spat in
+      let used_memory = ref NodeSet.empty in
+      let segment_intervals = List.map (fun (a, b) -> nodes_in_all_paths a b) mem_spat in
       List.iter(fun pi -> if not (g.unsat) then
-        if NodeSet.inter used_memory pi != NodeSet.empty then g.unsat <- true else used_memory := NodeSet.union used_memory pi
+        if NodeSet.inter !used_memory pi != NodeSet.empty then g.unsat <- true else used_memory := NodeSet.union !used_memory pi
       )segment_intervals
     )
 end
