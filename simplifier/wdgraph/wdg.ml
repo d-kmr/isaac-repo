@@ -268,41 +268,18 @@ module WDGraph = struct
       let r_a = try r_scc (f_scc a) with | Not_found -> a in
       let r_b = try r_scc (f_scc b) with | Not_found -> b in
       match r_a with 
-      | Int i when i <= 0 | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address *)
+      | Int i when i <= 0 -> g.unsat <- true
+      | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address *)
       | _ -> (* Add edge *)
         let g' = G.add_edge_e g.quotient_graph (r_a, (-2), r_b) in (* -2: encoding for pointer edge *) 
         g.quotient_graph <- g'
-      )) ptr_spat in
-      if not (g.unsat) then (* Check for green (-2) outdegree > 1 *)
-        List.iter(fun (a,_) -> if not (g.unsat) then
-          let r_a = try r_scc (f_scc a) with | Not_found -> a in
-          let green_out = G.succ_e g.quotient_graph r_a |> List.filter (fun (_, _, l) -> l = (-2)) |> List.length in (* -2: encoding for pointer edge *) 
-          if green_out > 1 then g.unsat <- true
-          ) ptr_spat
-  
-  let is_inconsistent_pto_spat (g : t) (ptr_spat : SHterm.t list) : bool =
-  (* Check address positive not null: representative or relations *)
-  let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
-  let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
-  let has_duplicated_or_neg_address =
-    let rec check seen = function
-      | [] -> false
-      | x :: xs ->
-        match (try Some (r_scc (f_scc x)) with _ -> None) with
-        | None -> check seen xs 
-        | Some representative ->
-          match representative with
-          | Int i when i <= 0 -> true
-          | Sub [Int a; Int b] when a-b <=0 -> true
-          | _ -> if Hashtbl.mem seen representative then true 
-          else (
-            Hashtbl.add seen representative ();
-            check seen xs
-          )    
-    in
-    let seen = Hashtbl.create (List.length ptr_spat) in
-    check seen ptr_spat in
-  has_duplicated_or_neg_address
+      )) ptr_spat;
+    if not (g.unsat) then (* Check for green (-2) outdegree > 1 *)
+      List.iter(fun (a,_) -> if not (g.unsat) then
+        let r_a = try r_scc (f_scc a) with | Not_found -> a in
+        let green_out = G.succ_e g.quotient_graph r_a |> List.filter(fun (_, l, _) -> l = (-2)) |> List.length in (* -2: encoding for pointer edge *) 
+        if green_out > 1 then g.unsat <- true
+        ) ptr_spat
 
   let is_inconsistent_mem_spat (g : t) (mem_spat : (SHterm.t * SHterm.t) list) : bool =
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
