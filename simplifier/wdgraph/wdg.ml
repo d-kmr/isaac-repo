@@ -281,49 +281,60 @@ module WDGraph = struct
         if green_out > 1 then g.unsat <- true
         ) ptr_spat
 
-  let is_inconsistent_mem_spat (g : t) (mem_spat : (SHterm.t * SHterm.t) list) : bool =
+  
+  let add_mem_spat (g : t) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) :  unit = 
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
     let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
-    let early_termination = ref false in
-    let filtered_mem_spat = List.filter_map(fun (a,b) -> 
-      match (try Some (r_scc (f_scc a)) with _ -> None) with
-      | None -> None 
-      | Some r_a -> match r_a with 
-        | Int i when i <= 0 -> early_termination := true; None
-        | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
-        | _ -> match (try Some (r_scc (f_scc b)) with _ -> None) with
-          | None -> None 
-          | Some r_b -> match r_b with
-            | Int i when i <= 0 -> early_termination := true; None
-            | Sub [Int x; Int y] when x-y <=0 -> early_termination := true; None
-            | _ -> Some (r_a, r_b)
-      ) mem_spat in (* The pairs of nodes we do not have in the graph we skip them (no information) *)
-    if !early_termination then true else (
-    (* Function to compute nodes in all paths *)
-    let nodes_in_all_paths a b =
-      (* 1. Compute nodes reachable from A (forward reachability) *)
-      let forward_reachable_nodes = G.fold_succ (fun x acc -> NodeSet.add x acc) g.quotient_graph a (NodeSet.add a NodeSet.empty) in
-      (* 2. Compute nodes that can reach B (backward reachability) *)
-      let backward_reachable_nodes = G.fold_pred (fun x acc -> NodeSet.add x acc) g.quotient_graph b (NodeSet.add b NodeSet.empty) in
-      
-      (* 3. Intersection of forward and backward reachable nodes *)
-      NodeSet.inter forward_reachable_nodes backward_reachable_nodes 
-    in
-    let l =  List.length filtered_mem_spat in
-    (*List.iter(fun (a, b) -> SHterm.print a; SHterm.print b) filtered_mem_spat;*)
-    let segment_intervals = List.map (fun (a, b) -> nodes_in_all_paths a b) filtered_mem_spat in
-    let seen = Hashtbl.create 32 in
-      try
-        List.iter (fun set ->
-          NodeSet.iter (fun elt ->
-            if Hashtbl.mem seen elt then
-              raise Exit (* Duplicate found *)
-            else
-              Hashtbl.add seen elt ()
-          ) set
-        ) segment_intervals;
-        false (* No duplicates found *)
-      with
-      | Exit -> true (* Duplicate found *)
+    List.iter(fun (a,b) -> if not (g.unsat) then (
+      let r_a = try r_scc (f_scc a) with | Not_found -> a in
+      let r_b = try r_scc (f_scc b) with | Not_found -> b in
+      match r_a with 
+      | Int i when i <= 0 -> g.unsat <- true
+      | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in a *)
+      | _ -> match r_b with
+        | Int i when i <= 0 -> g.unsat <- true
+        | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in b *)
+        | _ -> (* Add edge *)
+          let g' = G.add_edge_e g.quotient_graph (r_a, (-3), r_b) in (* -3: encoding for array edge *) 
+          g.quotient_graph <- g'
+      )) arr_spat;
+    if not (g.unsat) then
+      List.iter(fun (a,b) -> if not (g.unsat) then (
+        let r_a = try r_scc (f_scc a) with | Not_found -> a in
+        let r_b = try r_scc (f_scc b) with | Not_found -> b in
+        match r_a with 
+        | Int i when i <= 0 -> g.unsat <- true
+        | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in a *)
+        | _ -> match r_b with
+          | Int i when i <= 0 -> g.unsat <- true
+          | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in b *)
+          | _ -> (* Add edge *)
+            let g' = G.add_edge_e g.quotient_graph (r_a, (-4), r_b) in (* -4: encoding for string edge *) 
+            g.quotient_graph <- g'
+        )) str_spat;
+    if not (g.unsat) then ( (* Check for no cycles for all pairs array+string *)
+      let module Path = Path.Check(G) in
+      let pc = Path.create(g.quotient_graph) in 
+      List.iter (fun (a, b) -> if not (g.unsat) then
+        let r_a = try r_scc (f_scc a) with | Not_found -> a in
+        let r_b = try r_scc (f_scc b) with | Not_found -> b in
+        if Path.check_path pc r_b r_a then g.unsat <- true) arr_spat::str_spat
+    )
+    if not (g.unsat) then ((* Check for overlaps in memory *)
+      let nodes_in_all_paths a b =
+        (* 1. Compute nodes reachable from A (forward reachability) *)
+        let forward_reachable_nodes = G.fold_succ (fun x acc -> NodeSet.add x acc) g.quotient_graph a (NodeSet.add a NodeSet.empty) in
+        (* 2. Compute nodes that can reach B (backward reachability) *)
+        let backward_reachable_nodes = G.fold_pred (fun x acc -> NodeSet.add x acc) g.quotient_graph b (NodeSet.add b NodeSet.empty) in
+        
+        (* 3. Intersection of forward and backward reachable nodes *)
+        NodeSet.inter forward_reachable_nodes backward_reachable_nodes 
+      in
+      let used_memory = ref NodeSet in
+      used_memory := NodeSet.empty;
+      let segment_intervals = List.map (fun (a, b) -> nodes_in_all_paths a b) arr_spat::str_spat in
+      List.iter(fun pi -> if not (g.unsat) then
+        if NodeSet.inter used_memory pi != NodeSet.empty then g.unsat <- true else used_memory := NodeSet.union used_memory pi
+      )segment_intervals
     )
 end

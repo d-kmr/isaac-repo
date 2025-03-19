@@ -198,7 +198,7 @@ let process_conjunctions (p : SHpure.t) (ptr_spat : (SHterm.t * SHterm.t) list) 
       let _ = WDGraph.add_conjunctions g conjunctions in 
       let _ = WDGraph.simplify g in 
       let _ = WDGraph.add_ptr g ptr_spat in
-      let _ = WDGraph.add_mem_spatt g arr_spat str_spat in
+      let _ = WDGraph.add_mem_spat g arr_spat str_spat in
       let simplified_conjunctions = WDGraph.get_conjunctions_eval_atom g in (* WDGraph.get_conjunctions g in  #TODO: Remove this if we end up not using it *)
         begin match simplified_conjunctions with
         | [False] -> False
