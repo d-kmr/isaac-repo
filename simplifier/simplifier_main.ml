@@ -77,7 +77,6 @@ let () =
   let end_time_parse = Unix.gettimeofday () in
   let elapsed_time_parse = end_time_parse -. start_time_parse in
   Printf.printf "Execution time: %f seconds\n" elapsed_time_parse;
-  Printf.printf "Stats: %b" !_stats; 
   Fmt.printf "@[[Pure-formula]@.";
   Fmt.printf "@[%a@." P.pp p;  
   Fmt.printf "@[[Spatial-formula]@.";
@@ -86,10 +85,8 @@ let () =
   (*let p' = Simplifier.simplify_pure p !_stats !_postprocess in*)
   let p' = Simplifier.simplify_pure_spat p ss !_stats in
 
-  Fmt.printf "@[[Simplified Pure-formula]@.";
-  Fmt.printf "@[%a@." P.pp p';
-  Fmt.printf "@[[Spatial-formula]@.";
-  Fmt.printf "@[%a@." SS.pp ss;
+  Fmt.printf "@[[Simplified formula]@.";
+  Fmt.printf "@[%a@." DisjSH.pp p';
   
 (*  
   let (startMesRaw,ssMes) = if !_rawflag then ("RAW-MODE ","Ignored") else ("","") in
