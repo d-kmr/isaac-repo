@@ -6,6 +6,13 @@ module NodeSet = Set.Make(struct
   let compare = SHterm.compare
 end)
 
+type edge_label = 
+  | Red
+  | Blue
+  | Yellow
+  | Orange
+  | Green of string
+
 (* Define the graph module using OCamlgraph's Persistent.Digraph.ConcreteLabeled functor *)
 module WDGraph = struct
   (* Define a custom graph with integer nodes and edges labeled with weights *)
@@ -15,9 +22,20 @@ module WDGraph = struct
     let hash = Hashtbl.hash
     let equal = (=)
   end)(struct
-    type t = int  (* label of edges *)
-    let compare = compare
-    let default = 0
+    type t = edge_label
+    let compare x y = 
+      match (x, y) with
+      | Red, _ -> -1
+      | _, Red -> 1
+      | Blue, _ -> -1
+      | _, Blue -> 1
+      | Yellow, _ -> -1
+      | _, Yellow -> 1
+      | Orange, _ -> -1
+      | _, Orange -> 1
+      | Green s1, Green s2 -> String.compare s1 s2
+      | _, _ -> 0
+    let default = Red
   end)
 
   (* Define a record type for the graph structure *)
@@ -51,8 +69,7 @@ module WDGraph = struct
     if SHterm.compare u v <= 0 then (u, v) else (v, u)
 
   (* Add an edge to the graph *)
-  let add_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : int) : unit =
-    if w = (-1) && u = v then g.unsat <- true; (* Black contradiction: `x < x` *)
+  let add_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : edge_label) : unit =
     if not (g.unsat) then
       (* Make sure nodes exist *)
       let g' = G.add_vertex (G.add_vertex g.graph u) v in
@@ -60,7 +77,7 @@ module WDGraph = struct
         (* Check if there is an existing black edge between u and v *)
         try
           let _ = Hashtbl.find g.black_edges black_pair in
-          let g' = G.add_edge_e g' (u, 0, v) in
+          let g' = G.add_edge_e g' (u, Red, v) in
           g.graph <- g';
           g.red_edges <- (u, v) :: g.red_edges;
           Hashtbl.remove g.black_edges black_pair
@@ -72,26 +89,26 @@ module WDGraph = struct
               if w <> w' then
                 (* Update the weight to 0 if the weights differ *)
                 let g' = G.remove_edge_e g' (u, w', v) in
-                let g' = G.add_edge_e g' (u, 0, v) in
+                let g' = G.add_edge_e g' (u, Red, v) in
                 g.graph <- g';
                 g.red_edges <- (u, v) :: g.red_edges;
           with Not_found ->
             (* If no edge exists, simply add it *)
             let g' = G.add_edge_e g' (u, w, v) in
             g.graph <- g';
-            if w = 0 then g.red_edges <- (u, v) :: g.red_edges
+            if w = Red then g.red_edges <- (u, v) :: g.red_edges
 
   (* Add an edge to the quotient graph *)
-  let add_quotient_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : int) : unit =
+  let add_quotient_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : edge_label) : unit =
     if not (g.unsat) then
       try
         let edge = G.find_edge g.quotient_graph u v in
         match edge with
-        | (_,w',_) when w' >= 0 ->
+        | (_,w',_) ->
           if w <> w' then
             (* Update the weight to 0 if the weights differ *)
             let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
-            let g' = G.add_edge_e g' (u, 0, v) in
+            let g' = G.add_edge_e g' (u, Red, v) in
             g.quotient_graph <- g'
         | _ -> let g' = G.add_edge_e g.quotient_graph (u, w, v) in
           g.quotient_graph <- g'
@@ -150,13 +167,14 @@ module WDGraph = struct
               let t1 = List.nth tt 1 in
                 match op with
                 | Eq -> 
-                    add_edge g t0 t1 1;
-                    add_edge g t1 t0 1;
-                | Neq -> 
+                    add_edge g t0 t1 Blue;
+                    add_edge g t1 t0 Blue;
+                | Neq -> if t0 = t1 then g.unsat <- true else (  (* Black contradiction: `x != x` *)
                   g.graph <- G.add_vertex (G.add_vertex g.graph t0) t1;
                   Hashtbl.replace g.black_edges (normalize_term_pair t0 t1) ();
-                | Le -> add_edge g t0 t1 1;
-                | Lt -> add_edge g t0 t1 0;
+                  )
+                | Le -> add_edge g t0 t1 Blue;
+                | Lt -> add_edge g t0 t1 Red;
         ) atoms
 
   (* Simplify the graph, i.e. post-analyssis of diferent properties *)
@@ -217,25 +235,9 @@ module WDGraph = struct
             g.graph;
             (* clean expresions in nodes *)
             g.quotient_graph <- G.map_vertex(fun u -> postprocess_and_eval_terms g u) g.quotient_graph
-  
-  (* Given a graph extract the terms and type of relation from edge and return a new conjunction list (all elements will be Atoms) *)
-  let get_conjunctions (g : t) : SHpure.t list = 
-    if g.unsat then 
-      [False]
-    else 
-      let rb_atoms = 
-      G.fold_edges_e (fun (u, w, v) acc -> 
-        match w with
-        | 0 -> SHpure.Atom(Lt, [u; v]) :: acc
-        | 1 -> SHpure.Atom(Le, [u; v]) :: acc
-        | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
-      ) g.quotient_graph [] in
-      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> SHpure.Atom(Neq, [u; v]) :: acc ) g.black_edges [] in
-      let eq_atoms = List.map(fun (u, v) -> SHpure.Atom(Eq, [u; v])) g.eq_representative_pairs in
-      eq_atoms@rb_atoms@black_atoms
 
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list with its terms and atoms evaluated if possible *)
-  let get_conjunctions_eval_atom (g : t) : SHpure.t list = 
+  let get_conjunctions_eval_atom (g : t) : SHpure.t * SHspat.t = 
     let eval_atom a = 
       match a with
       |SHpure.Atom(Le, [Int x; Int y]) -> if x <= y then SHpure.True else SHpure.False
@@ -245,42 +247,64 @@ module WDGraph = struct
       |_ -> a
     in 
     if g.unsat then 
-      [False]
-    else 
-      let rb_atoms =
-      G.fold_edges_e (fun (u, w, v) acc -> 
+      (False, [])
+    else (
+      let rb_atoms = ref [] in
+      let yo_atoms = ref [] in
+      let g_edges_info = Hashtbl.create 32 in
+      G.iter_edges_e (fun (u, w, v) -> 
         match w with
-        | 0 -> eval_atom(SHpure.Atom(Lt, [u; v])) :: acc
-        | 1 -> eval_atom(SHpure.Atom(Le, [u; v])) :: acc
+        | Red -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
+        | Blue -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
+        | Yellow -> yo_atoms := SHspatExp.Arr(u,v) :: !yo_atoms
+        | Orange -> yo_atoms := SHspatExp.Str(u,v) :: !yo_atoms
+        | Green f -> Hashtbl.add g_edges_info u (f, v)
         | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
-      ) g.quotient_graph [] in
+      ) g.quotient_graph;
       let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> eval_atom(SHpure.Atom(Neq, [u; v])) :: acc ) g.black_edges [] in
       let eq_atoms = List.map(fun (u, v) -> eval_atom(SHpure.Atom(Eq, [u; v]))) g.eq_representative_pairs in
-      let red_atoms = eq_atoms@rb_atoms@black_atoms in
-      if List.exists(fun e -> e == SHpure.False) red_atoms then [False] 
-      else List.filter(fun e -> e != SHpure.True) red_atoms
+      let pure_atoms = eq_atoms @ !rb_atoms @ black_atoms in
+      let g_atoms = ref [] in 
+      Hashtbl.iter (fun key _ ->
+          let values = Hashtbl.find_all g_edges_info key in
+          if List.length values = 1 then
+            g_atoms := SHspatExp.Pto(key, []) :: !g_atoms
+          else
+            g_atoms := SHspatExp.Pto(key, values) :: !g_atoms
+      ) g_edges_info; (* Format in [({key} SHPure.Atom, [{value}(field, SHPure.Atom)]) *)
+      let spat_atoms = !g_atoms @ !yo_atoms in
+      if List.exists(fun e -> e == SHpure.False) pure_atoms then (False, [])
+      else (SHpure.And (List.filter(fun e -> e != SHpure.True) pure_atoms), spat_atoms)
+    )
 
   
-  let add_ptr (g : t) (ptr_spat : (SHterm.t * SHterm.t) list) : unit =
+  let add_ptr (g : t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) : unit =
+    let check_no_green_edges_before r_a =  (* returns true if any green edge present *)
+      try
+        let edges = G.succ_e g.quotient_graph r_a in
+        let green_edges = List.filter (fun (_, w, _) -> match w with Green _ -> true | _ -> false) edges in
+        List.length green_edges > 0
+      with Invalid_argument _ -> false in (* If node not found in the quotioent graph *)
+
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
     let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
-    List.iter(fun (a,b) -> if not (g.unsat) then (
+    List.iter(fun (a,bs) -> if not (g.unsat) then (
       let r_a = try r_scc (f_scc a) with | Not_found -> a in
-      let r_b = try r_scc (f_scc b) with | Not_found -> b in
       match r_a with 
       | Int i when i <= 0 -> g.unsat <- true
       | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address *)
       | _ -> (* Add edge *)
-        let g' = G.add_edge_e g.quotient_graph (r_a, (-2), r_b) in (* -2: encoding for pointer edge *) 
-        g.quotient_graph <- g'
-      )) ptr_spat;
-    if not (g.unsat) then (* Check for green (-2) outdegree > 1 *)
-      List.iter(fun (a,_) -> if not (g.unsat) then
-        let r_a = try r_scc (f_scc a) with | Not_found -> a in
-        let green_out = G.succ_e g.quotient_graph r_a |> List.filter(fun (_, l, _) -> l = (-2)) |> List.length in (* -2: encoding for pointer edge *) 
-        if green_out > 1 then g.unsat <- true
-        ) ptr_spat
-
+        if check_no_green_edges_before r_a then g.unsat <- true else match bs with
+          | [] ->
+            let g' = G.add_edge_e g.quotient_graph (r_a, Green "", r_a) in (* self pointing green edge. Case: x -> () *) 
+            g.quotient_graph <- g'
+          | _ -> 
+            List.iter(fun (f, b) -> 
+                let r_b = try r_scc (f_scc b) with | Not_found -> b in
+                let g' = G.add_edge_e g.quotient_graph (r_a, Green f, r_b) in 
+                g.quotient_graph <- g';
+              ) bs
+      )) ptr_spat
   
   let add_mem_spat (g : t) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) :  unit = 
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
@@ -296,7 +320,7 @@ module WDGraph = struct
         | Int i when i <= 0 -> g.unsat <- true
         | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in b *)
         | _ -> (* Add edge *)
-          let g' = G.add_edge_e g.quotient_graph (r_a, (-3), r_b) in (* -3: encoding for array edge *) 
+          let g' = G.add_edge_e g.quotient_graph (r_a, Yellow, r_b) in 
           g.quotient_graph <- g'
       )) arr_spat;
     if not (g.unsat) then
@@ -310,7 +334,7 @@ module WDGraph = struct
           | Int i when i <= 0 -> g.unsat <- true
           | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in b *)
           | _ -> (* Add edge *)
-            let g' = G.add_edge_e g.quotient_graph (r_a, (-4), r_b) in (* -4: encoding for string edge *) 
+            let g' = G.add_edge_e g.quotient_graph (r_a, Orange, r_b) in 
             g.quotient_graph <- g'
       )) str_spat;
     if not (g.unsat) then ( (* Check for no cycles for all pairs array+string *)
