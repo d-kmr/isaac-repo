@@ -2608,23 +2608,16 @@ module DisjSH = struct
     
   type t = (SHpure.t * SHspat.t) list
 
-  let print fmt = function 
-  | [] -> ()
+  let pp fmt p = match p with 
+  | [] -> Format.fprintf fmt "False && Emp" 
   | [(shp, shs)] -> 
-    Format.fprintf fmt "@[%a && %a@]" SHpure.pp shp SHspat.pp shs
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs
   | (shp, shs) :: ps -> 
-    Format.fprintf fmt "@[%a && %a" SHpure.pp shp SHspat.pp shs;
-    List.iter (fun (shp', shs') -> Format.fprintf fmt " | %a && %a" SHpure.pp shp' SHspat.pp shs') ps;
-    Format.fprintf fmt "@]"
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs;
+    List.iter (fun (shp', shs') -> Format.fprintf fmt " | %a && %a" SHpure.pp shp' SHspat.pp shs') ps
 
-  let println fmt = function 
-  | [] -> ()
-  | [(shp, shs)] -> 
-    Format.fprintf fmt "@[%a && %a@." SHpure.pp shp SHspat.pp shs
-  | (shp, shs) :: ps -> 
-    Format.fprintf fmt "@[%a && %a" SHpure.pp shp SHspat.pp shs;
-    List.iter (fun (shp', shs') -> Format.fprintf fmt " | %a && %a" SHpure.pp shp' SHspat.pp shs') ps;
-    Format.fprintf fmt "@."
+  let print = Format.printf "@[%a@]" pp
+  let println = Format.printf "@[%a@." pp
 
 end
 ;;
