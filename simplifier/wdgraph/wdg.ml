@@ -252,26 +252,26 @@ module WDGraph = struct
       let rb_atoms = ref [] in
       let yo_atoms = ref [] in
       let g_edges_info = Hashtbl.create 32 in
+      let unique_key_nodes = ref NodeSet.empty in (* To avoid repeating pointer atoms for each field, this happens due to internal implementation of hash tables iterators *)
       G.iter_edges_e (fun (u, w, v) -> 
         match w with
         | Red -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
         | Blue -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
         | Yellow -> yo_atoms := SHspatExp.Arr(u,v) :: !yo_atoms
         | Orange -> yo_atoms := SHspatExp.Str(u,v) :: !yo_atoms
-        | Green f -> Hashtbl.add g_edges_info u (f, v)
+        | Green f -> Hashtbl.add g_edges_info u (f, v); unique_key_nodes := NodeSet.add u !unique_key_nodes 
         | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
       ) g.quotient_graph;
       let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> eval_atom(SHpure.Atom(Neq, [u; v])) :: acc ) g.black_edges [] in
       let eq_atoms = List.map(fun (u, v) -> eval_atom(SHpure.Atom(Eq, [u; v]))) g.eq_representative_pairs in
       let pure_atoms = eq_atoms @ !rb_atoms @ black_atoms in
       let g_atoms = ref [] in 
-      Hashtbl.iter (fun key _ ->
+      NodeSet.iter (fun key ->
           let values = Hashtbl.find_all g_edges_info key in
-          if List.length values = 1 then
-            g_atoms := SHspatExp.Pto(key, []) :: !g_atoms
-          else
-            g_atoms := SHspatExp.Pto(key, values) :: !g_atoms
-      ) g_edges_info; (* Format in [({key} SHPure.Atom, [{value}(field, SHPure.Atom)]) *)
+          match values with
+          | [("", b)] when key = b -> g_atoms := SHspatExp.Pto(key, []) :: !g_atoms
+          | _ -> g_atoms := SHspatExp.Pto(key, values) :: !g_atoms
+      ) !unique_key_nodes; (* Format in [({key} SHPure.Atom, [{value}(field, SHPure.Atom)]) *)
       let spat_atoms = !g_atoms @ !yo_atoms in
       if List.exists(fun e -> e == SHpure.False) pure_atoms then (False, [])
       else (SHpure.And (List.filter(fun e -> e != SHpure.True) pure_atoms), spat_atoms)
