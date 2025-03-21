@@ -190,25 +190,21 @@ let eval_atom (a : SHpure.t) : SHpure.t =
   |Atom(Eq, [Int x; Int y]) -> if x != y then False else a
   |_ -> a
 
-let process_conjunctions (p : SHpure.t) (ptr_spat : (SHterm.t * SHterm.t) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) : SHpure.t =
+let process_conjunctions (p : SHpure.t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) : SHpure.t * SHspat.t =
   match p with
-  | Atom (_, _) -> eval_atom p (* #TODO: Check spatial for only one atom too, with one atom we just need to check address is not null positive *)
+  | Atom (_, _) -> (eval_atom p, [] ) (* #TODO: Check spatial for only one atom too, with one atom we just need to check address is not null positive *)
   | And conjunctions ->
       let g = WDGraph.create () in
       let _ = WDGraph.add_conjunctions g conjunctions in 
-      let _ = WDGraph.simplify g in 
+      let _ = WDGraph.simplify g in
+      let _ = WDGraph.add_mem_spat g arr_spat str_spat in  (* IMPORTANT first add array over pointers, otherwise will be hard to check for cycles of yellow edges to detect backward edges (src memory addres > dst memory adress ) *)
       let _ = WDGraph.add_ptr g ptr_spat in
-      let _ = WDGraph.add_mem_spat g arr_spat str_spat in
-      let simplified_conjunctions = WDGraph.get_conjunctions_eval_atom g in (* WDGraph.get_conjunctions g in  #TODO: Remove this if we end up not using it *)
-        begin match simplified_conjunctions with
-        | [False] -> False
-        | _ -> And simplified_conjunctions
-        end
+      WDGraph.get_conjunctions_eval_atom g; (* WDGraph.get_conjunctions g in  #TODO: Remove this if we end up not using it *)
   | _ -> failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
 
 (* Currently just filtering falses *)
-let rec process_disjunction (p : SHpure.t list) : SHpure.t list = 
-  List.filter(fun p' -> p' <> SHpure.False) p
+let rec process_disjunction (p : (SHpure.t * SHspat.t) list) : (SHpure.t * SHspat.t) list = 
+  List.filter(fun p' -> p' <> (SHpure.False, [])) p
 
 let rec shpure_atom_size (p: SHpure.t) : int = 
   match p with 
@@ -216,7 +212,10 @@ let rec shpure_atom_size (p: SHpure.t) : int =
   | And pp | Or pp -> pp |> List.map(fun e -> shpure_atom_size e) |> List.fold_left(fun e acc -> e + acc) 0
   | Imp (a, b) -> (shpure_atom_size a) + (shpure_atom_size b)
 
-let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : SHpure.t =
+let disj_atom_size (p: (SHpure.t * SHspat.t) list) : int = 
+  List.fold_left(fun acc (shp, _) -> (shpure_atom_size shp) + acc) 0 p
+
+let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : DisjSH.t =
   let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
   let ptr_spat = SHspat.getPtrSeg ss in
@@ -232,24 +231,24 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : SHpure.t =
   match dnf_p with
   | Or clauses -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = SHpure.Or (process_disjunction(List.map (fun clause -> process_conjunctions clause ptr_spat arr_spat str_spat) clauses)) in
+    let red_dnf_p = process_disjunction(List.map (fun clause -> process_conjunctions clause ptr_spat arr_spat str_spat) clauses) in
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     
     if _stats then Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-    if _stats then  Printf.printf "Size of reduced formulae (atoms): %d\n\n" (shpure_atom_size red_dnf_p);
+    if _stats then  Printf.printf "Size of reduced formulae (atoms): %d\n\n" (disj_atom_size red_dnf_p);
 
     red_dnf_p
   | And _ -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = process_conjunctions dnf_p ptr_spat arr_spat str_spat in 
+    let red_dnf_p = [process_conjunctions dnf_p ptr_spat arr_spat str_spat] in 
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     
     if _stats then Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-    if _stats then Printf.printf "Size of reduced formulae (atoms): %d\n\n" (shpure_atom_size red_dnf_p);
+    if _stats then Printf.printf "Size of reduced formulae (atoms): %d\n\n" (disj_atom_size red_dnf_p);
 
     red_dnf_p
-  | _ -> eval_atom dnf_p 
+  | _ -> [(eval_atom dnf_p, [])]
   
 ;;
