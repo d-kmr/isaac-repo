@@ -2616,8 +2616,16 @@ module DisjSH = struct
     Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs;
     List.iter (fun (shp', shs') -> Format.fprintf fmt " | %a && %a" SHpure.pp shp' SHspat.pp shs') ps
 
+  let ppln fmt p = match p with 
+  | [] -> Format.fprintf fmt "False && Emp" 
+  | [(shp, shs)] -> 
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs
+  | (shp, shs) :: ps -> 
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs;
+    List.iter (fun (shp', shs') -> Format.fprintf fmt " |\n%a && %a" SHpure.pp shp' SHspat.pp shs') ps
+
   let print = Format.printf "@[%a@]" pp
-  let println = Format.printf "@[%a@." pp
+  let println = Format.printf "@[%a@." ppln
 
 end
 ;;
