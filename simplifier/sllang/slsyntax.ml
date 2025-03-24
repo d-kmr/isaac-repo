@@ -2014,7 +2014,19 @@ module SHspatExp = struct
 
   let getStringSeg (s : t) = match s with
     | Str(t1,t2) -> [(t1,t2)]
-    | _ -> []      
+    | _ -> []
+
+  let getMemSeg (s : t) = match s with
+    | Str(t1,t2) | Arr(t1,t2) -> [(t1,t2)]
+    | _ -> []
+    
+  let getPtoSeg (s : t) = match s with
+    | Pto(t, _) -> [t]
+    | _ -> []
+  
+  let getPtrSeg (s : t) = match s with
+    | Pto(t1, t2) -> [(t1, t2)]
+    | _ -> []
 
   let mkInterval (s : t) = match s with
     | Pto(t,_) -> (t,t)
@@ -2231,6 +2243,15 @@ module SHspat = struct
 
   let getStringSeg (ss : t) = 
     List.concat (List.map SHspatExp.getStringSeg ss)
+
+  let getMemSeg (ss : t) =
+    List.concat (List.map SHspatExp.getMemSeg ss)
+  
+  let getPtoSeg (ss : t) =
+    List.concat (List.map SHspatExp.getPtoSeg ss)
+  
+  let getPtrSeg (ss : t) =
+    List.concat (List.map SHspatExp.getPtrSeg ss)
 
   let mkSegment (ss : t) = List.map S.mkInterval ss
     
@@ -2578,6 +2599,33 @@ module QFEntl = struct
   let print = Format.printf "@[%a@]" pp
   let println = Format.printf "@[%a@." pp
   let nf = upfunc Entl.nf
+
+end
+;;
+
+(* Module of Disjunction of Symbolic Heaps *)  
+module DisjSH = struct
+    
+  type t = (SHpure.t * SHspat.t) list
+
+  let pp fmt p = match p with 
+  | [] -> Format.fprintf fmt "False && Emp" 
+  | [(shp, shs)] -> 
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs
+  | (shp, shs) :: ps -> 
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs;
+    List.iter (fun (shp', shs') -> Format.fprintf fmt " | %a && %a" SHpure.pp shp' SHspat.pp shs') ps
+
+  let ppln fmt p = match p with 
+  | [] -> Format.fprintf fmt "False && Emp" 
+  | [(shp, shs)] -> 
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs
+  | (shp, shs) :: ps -> 
+    Format.fprintf fmt "%a && %a" SHpure.pp shp SHspat.pp shs;
+    List.iter (fun (shp', shs') -> Format.fprintf fmt " |\n%a && %a" SHpure.pp shp' SHspat.pp shs') ps
+
+  let print = Format.printf "@[%a@]" pp
+  let println = Format.printf "@[%a@." ppln
 
 end
 ;;
