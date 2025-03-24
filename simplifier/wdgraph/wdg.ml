@@ -122,17 +122,11 @@ module WDGraph = struct
     let pc = Path.create(g.graph) in 
     List.exists (fun (u, v) -> Path.check_path pc v u) g.red_edges
 
-  (* Postprocess an Atom s.t. its terms are minimal *)
+  (* Postprocess an Atom s.t. its terms are minimal *) (* #TODO: filter identities like we do in `filter_identities_and_eval` at `simplifier.ml` *)
   let rec postprocess_and_eval_terms (g : t) (a : Slsyntax.SHterm.t) : Slsyntax.SHterm.t =
     (* on complex epesion try to recursively match terms into representative method until u find one and stop *)
-    let r_scc = begin match g.r_scc with 
-    | Some f -> f
-    | _ -> failwith "r_scc not computed before `postprocess_and_eval_terms`"
-    end in
-    let f_scc = begin match g.f_scc with 
-    | Some f -> f
-    | _ -> failwith "f_scc not computed before `postprocess_and_eval_terms`"
-    end in
+    let r_scc = match g.r_scc with | Some f -> f | _ -> failwith "r_scc not computed before `postprocess_and_eval_terms`" in
+    let f_scc = match g.f_scc with  | Some f -> f | _ -> failwith "f_scc not computed before `postprocess_and_eval_terms`" in
     match a with 
     | Var _ -> a
     | Int _ -> a
@@ -238,7 +232,7 @@ module WDGraph = struct
 
   (* Given a graph extract the terms and type of relation from edge and return a new conjunction list with its terms and atoms evaluated if possible *)
   let get_conjunctions_eval_atom (g : t) : SHpure.t * SHspat.t = 
-    let eval_atom a = 
+    let eval_atom a =  (* Evaluate atoms if all information is known *)
       match a with
       |SHpure.Atom(Le, [Int x; Int y]) -> if x <= y then SHpure.True else SHpure.False
       |SHpure.Atom(Lt, [Int x; Int y]) -> if x < y then SHpure.True else SHpure.False
@@ -249,12 +243,12 @@ module WDGraph = struct
     if g.unsat then 
       (False, [])
     else (
-      let rb_atoms = ref [] in
-      let yo_atoms = ref [] in
-      let g_edges_info = Hashtbl.create 32 in
-      let unique_key_nodes = ref NodeSet.empty in (* To avoid repeating pointer atoms for each field, this happens due to internal implementation of hash tables iterators *)
+      let rb_atoms = ref [] in (* Red / Blue edges (Pure) *)
+      let yo_atoms = ref [] in (* Yellow / Orange edges (Spatial *)
+      let g_edges_info = Hashtbl.create 32 in (* Green edges (Spatial) *)
+      let unique_key_nodes = ref NodeSet.empty in (* To avoid repeating pointer atoms for each field, this happens due to limitation in internal implementation of hash tables iterators (can't iterate over keys but just associations) *)
       G.iter_edges_e (fun (u, w, v) -> 
-        match w with
+        match w with  (* Rebuild atoms or expresions from edges *)
         | Red -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
         | Blue -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
         | Yellow -> yo_atoms := SHspatExp.Arr(u,v) :: !yo_atoms
@@ -262,10 +256,11 @@ module WDGraph = struct
         | Green f -> Hashtbl.add g_edges_info u (f, v); unique_key_nodes := NodeSet.add u !unique_key_nodes 
         | _ -> failwith "ERROR rebuilding graph, edge label (color) not suported"
       ) g.quotient_graph;
-      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> eval_atom(SHpure.Atom(Neq, [u; v])) :: acc ) g.black_edges [] in
-      let eq_atoms = List.map(fun (u, v) -> eval_atom(SHpure.Atom(Eq, [u; v]))) g.eq_representative_pairs in
-      let pure_atoms = eq_atoms @ !rb_atoms @ black_atoms in
-      let g_atoms = ref [] in 
+      let black_atoms = Hashtbl.fold (fun (u, v) _ acc -> eval_atom(SHpure.Atom(Neq, [u; v])) :: acc ) g.black_edges [] in (* Rebuilding inequality edges *)
+      (* Rebuilding equality information *) 
+      let eq_atoms = List.map(fun (u, v) -> eval_atom(SHpure.Atom(Eq, [u; v]))) g.eq_representative_pairs in (*redundant information as the equalities are treated by representatives, adding it just for readability in final formula *)
+      let pure_atoms = eq_atoms @ !rb_atoms @ black_atoms in 
+      let g_atoms = ref [] in (* Need some extra processing to rebuild the fieldterm_seq of the pointers*)
       NodeSet.iter (fun key ->
           let values = Hashtbl.find_all g_edges_info key in
           match values with
@@ -273,13 +268,14 @@ module WDGraph = struct
           | _ -> g_atoms := SHspatExp.Pto(key, values) :: !g_atoms
       ) !unique_key_nodes; (* Format in [({key} SHPure.Atom, [{value}(field, SHPure.Atom)]) *)
       let spat_atoms = !g_atoms @ !yo_atoms in
-      if List.exists(fun e -> e == SHpure.False) pure_atoms then (False, [])
+      (* DO a final simplification looking for false atoms in SHPure and filtering true atoms *)
+      if List.exists(fun e -> e == SHpure.False) pure_atoms then (False, []) 
       else (SHpure.And (List.filter(fun e -> e != SHpure.True) pure_atoms), spat_atoms)
     )
 
-  
+  (* Add pointer edges in the quotient graph and evaluates any inconsistency *)
   let add_ptr (g : t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) : unit =
-    let check_no_green_edges_before r_a =  (* returns true if any green edge present *)
+    let check_no_green_edges_before r_a =  (* returns true if any green edge present i.e. the node is already pointing to some other node/s *)
       try
         let edges = G.succ_e g.quotient_graph r_a in
         let green_edges = List.filter (fun (_, w, _) -> match w with Green _ -> true | _ -> false) edges in
@@ -293,12 +289,12 @@ module WDGraph = struct
       match r_a with 
       | Int i when i <= 0 -> g.unsat <- true
       | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address *)
-      | _ -> (* Add edge *)
+      | _ -> (* Add edge and check for consistency *)
         if check_no_green_edges_before r_a then g.unsat <- true else match bs with
-          | [] ->
-            let g' = G.add_edge_e g.quotient_graph (r_a, Green "", r_a) in (* self pointing green edge. Case: x -> () *) 
+          | [] -> (* adding self pointing green edge. Case: x -> () *)
+            let g' = G.add_edge_e g.quotient_graph (r_a, Green "", r_a) in 
             g.quotient_graph <- g'
-          | _ -> 
+          | _ -> (* Fieldterm_seq case, adding edges to every node in the seq. Case: x -> (f0:t0,f1:t1, ...) *)
             List.iter(fun (f, b) -> 
                 let r_b = try r_scc (f_scc b) with | Not_found -> b in
                 let g' = G.add_edge_e g.quotient_graph (r_a, Green f, r_b) in 
@@ -306,10 +302,12 @@ module WDGraph = struct
               ) bs
       )) ptr_spat
   
+  (* Add memory edges (array+string) in the quotient graph and evaluates any inconsistency *)
   let add_mem_spat (g : t) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) :  unit = 
-    let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
-    let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
-    let mem_spat = arr_spat @ str_spat in 
+    let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
+    let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
+    let mem_spat = arr_spat @ str_spat in
+    (* Add array edges checking for negative addresses *)
     List.iter(fun (a,b) -> if not (g.unsat) then (
       let r_a = try r_scc (f_scc a) with | Not_found -> a in
       let r_b = try r_scc (f_scc b) with | Not_found -> b in
@@ -324,6 +322,7 @@ module WDGraph = struct
           g.quotient_graph <- g'
       )) arr_spat;
     if not (g.unsat) then
+      (* Add string edges checking for negative addresses *)
       List.iter(fun (a,b) -> if not (g.unsat) then (
         let r_a = try r_scc (f_scc a) with | Not_found -> a in
         let r_b = try r_scc (f_scc b) with | Not_found -> b in
@@ -337,29 +336,33 @@ module WDGraph = struct
             let g' = G.add_edge_e g.quotient_graph (r_a, Orange, r_b) in 
             g.quotient_graph <- g'
       )) str_spat;
-    if not (g.unsat) then ( (* Check for no cycles for all pairs array+string *)
+    (* Check for no cycles for all pairs array+string. Avoiding "back edges", after quotient graph creation a DAG is generated, if adding any new edge generates a cycle
+      we got that we are trying to allocate memmory giving inverted address i.e. Arr(a,b) but b < a and should be  Arr(b,a) this is evaluated as False, not Emp *)
+    if not (g.unsat) then ( 
       let module Path = Path.Check(G) in
       let pc = Path.create(g.quotient_graph) in 
       List.iter(fun (a,b) -> if not (g.unsat) then (
         let r_a = try r_scc (f_scc a) with | Not_found -> a in
         let r_b = try r_scc (f_scc b) with | Not_found -> b in
-        if Path.check_path pc r_b r_a then g.unsat <- true)
+        if r_b != r_b && Path.check_path pc r_b r_a then g.unsat <- true) (* The case Arr(x,x) is valid *)
       ) mem_spat
     );
-    if not (g.unsat) then ((* Check for overlaps in memory *)
+    (* Main algorithm to check overlaps in memory. Checks for common nodes contained in each segment of memory *)
+    if not (g.unsat) then (
       let nodes_in_all_paths a b =
-        (* 1. Compute nodes reachable from A (forward reachability) *)
+        (* Compute nodes reachable from A, forward reachability *)
         let forward_reachable_nodes = G.fold_succ (fun x acc -> NodeSet.add x acc) g.quotient_graph a (NodeSet.add a NodeSet.empty) in
-        (* 2. Compute nodes that can reach B (backward reachability) *)
+        (* Compute nodes that can reach B, backward reachability *)
         let backward_reachable_nodes = G.fold_pred (fun x acc -> NodeSet.add x acc) g.quotient_graph b (NodeSet.add b NodeSet.empty) in
         
-        (* 3. Intersection of forward and backward reachable nodes *)
+        (* Intersection of forward and backward reachable nodes, this implementation is efficient with sparse graphs*) 
+        (* for more dense graphs a reachability precomputation and store the information beforehand might outperform the current implementation *)
         NodeSet.inter forward_reachable_nodes backward_reachable_nodes 
       in
       let used_memory = ref NodeSet.empty in
       let segment_intervals = List.map (fun (a, b) -> nodes_in_all_paths a b) mem_spat in
       List.iter(fun pi -> if not (g.unsat) then
-        if NodeSet.inter !used_memory pi != NodeSet.empty then g.unsat <- true else used_memory := NodeSet.union !used_memory pi
+        if not (g.unsat) && NodeSet.inter !used_memory pi != NodeSet.empty then g.unsat <- true else used_memory := NodeSet.union !used_memory pi
       )segment_intervals
     )
 end
