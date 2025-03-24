@@ -86,7 +86,7 @@ let () =
   let p' = Simplifier.simplify_pure_spat p ss !_stats in
 
   Fmt.printf "@[[Simplified formula]@.";
-  Fmt.printf "@[%a@." DisjSH.pp p';
+  Fmt.printf "@[%a@." DisjSH.ppln p';
   
 (*  
   let (startMesRaw,ssMes) = if !_rawflag then ("RAW-MODE ","Ignored") else ("","") in
