@@ -199,7 +199,7 @@ let process_conjunctions (p : SHpure.t) (ptr_spat : (SHterm.t * (string * SHterm
       let _ = WDGraph.simplify g in
       let _ = WDGraph.add_mem_spat g arr_spat str_spat in  (* IMPORTANT first add array over pointers, otherwise will be hard to check for cycles of yellow edges to detect backward edges (src memory addres > dst memory adress ) *)
       let _ = WDGraph.add_ptr g ptr_spat in
-      WDGraph.get_conjunctions_eval_atom g; (* WDGraph.get_conjunctions g in  #TODO: Remove this if we end up not using it *)
+      WDGraph.get_conjunctions_eval_atom g;
   | _ -> failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
 
 (* Currently just filtering falses *)
