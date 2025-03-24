@@ -82,7 +82,6 @@ let () =
   Fmt.printf "@[[Spatial-formula]@.";
   Fmt.printf "@[%a@." SS.pp ss;
 
-  (*let p' = Simplifier.simplify_pure p !_stats !_postprocess in*)
   let p' = Simplifier.simplify_pure_spat p ss !_stats in
 
   Fmt.printf "@[[Simplified formula]@.";
