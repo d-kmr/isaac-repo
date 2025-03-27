@@ -344,7 +344,7 @@ module WDGraph = struct
       List.iter(fun (a,b) -> if not (g.unsat) then (
         let r_a = try r_scc (f_scc a) with | Not_found -> a in
         let r_b = try r_scc (f_scc b) with | Not_found -> b in
-        if r_b != r_b && Path.check_path pc r_b r_a then g.unsat <- true) (* The case Arr(x,x) is valid *)
+        if r_b != r_a && Path.check_path pc r_b r_a then g.unsat <- true) (* The case Arr(x,x) is valid *)
       ) mem_spat
     );
     (* Main algorithm to check overlaps in memory. Checks for common nodes contained in each segment of memory *)
