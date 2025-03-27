@@ -303,7 +303,7 @@ module WDGraph = struct
       )) ptr_spat
   
   (* Add memory edges (array+string) in the quotient graph and evaluates any inconsistency *)
-  let add_mem_spat (g : t) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) :  unit = 
+  let add_mem_spat (g : t) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) :  unit = 
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
     let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
     let mem_spat = arr_spat @ str_spat in
@@ -360,6 +360,7 @@ module WDGraph = struct
         NodeSet.inter forward_reachable_nodes backward_reachable_nodes 
       in
       let used_memory = ref NodeSet.empty in
+      List.iter(fun (a,_) -> try used_memory := NodeSet.add (r_scc (f_scc a)) !used_memory with | Not_found -> used_memory := NodeSet.add a !used_memory) ptr_spat;
       let segment_intervals = List.map (fun (a, b) -> nodes_in_all_paths a b) mem_spat in
       List.iter(fun pi -> if not (g.unsat) then
         if not (g.unsat) && NodeSet.inter !used_memory pi != NodeSet.empty then g.unsat <- true else used_memory := NodeSet.union !used_memory pi
