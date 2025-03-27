@@ -250,5 +250,11 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : DisjSH.t =
 
     red_dnf_p
   | _ -> [(eval_atom dnf_p, [])]
+
+
+  let compute_prime_implicants (p : SHpure.t) : SHpure.t = p
+    (* Define mapping and inverse mapping *)
+
+    (* Traverse SHpure and *)
   
 ;;
