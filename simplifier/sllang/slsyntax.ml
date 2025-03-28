@@ -244,6 +244,20 @@ module SHterm = struct
   let print = Format.printf "@[%a@]" pp
 
   let println = Format.printf "@[%a@." pp
+
+  let to_string t =
+    let buf = Buffer.create 256 in
+    let fmt = Format.formatter_of_buffer buf in
+    Format.fprintf fmt "%a" pp t;
+    Format.pp_print_flush fmt ();
+    Buffer.contents buf
+  
+  let to_string_data t =
+    let buf = Buffer.create 256 in
+    let fmt = Format.formatter_of_buffer buf in
+    Format.fprintf fmt "%a" pp_data t;
+    Format.pp_print_flush fmt ();
+    Buffer.contents buf
               
   let plusOne t =
     match t with

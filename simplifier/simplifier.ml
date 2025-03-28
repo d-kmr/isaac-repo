@@ -1,6 +1,7 @@
 (*
   Simplifier of Symbolic Heaps
 *)
+open Notations
 open Slsyntax
 open Wdg
 
@@ -184,21 +185,40 @@ let to_dnf (p: SHpure.t) : SHpure.t =
 
 let eval_atom (a : SHpure.t) : SHpure.t = 
   match a with
-  |Atom(Le, [Int x; Int y]) -> if x > y then False else a
-  |Atom(Lt, [Int x; Int y]) -> if x >= y then False else a
-  |Atom(Neq, [Int x; Int y]) -> if not (x != y) then False else a
-  |Atom(Eq, [Int x; Int y]) -> if x != y then False else a
+  |Atom(Le, [Int x; Int y]) -> if x > y then False else True
+  |Atom(Lt, [Int x; Int y]) -> if x >= y then False else True
+  |Atom(Neq, [Int x; Int y]) -> if not (x != y) then False else True
+  |Atom(Eq, [Int x; Int y]) -> if x != y then False else True
   |_ -> a
 
-let process_conjunctions (p : SHpure.t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) : SHpure.t * SHspat.t =
+let process_conjunctions (p : SHpure.t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) (_serialize : bool) (_print : bool) : SHpure.t * SHspat.t =
   match p with
   | Atom (_, _) -> (eval_atom p, [] ) (* #TODO: Check spatial for only one atom too, with one atom we just need to check address is not null positive *)
   | And conjunctions ->
       let g = WDGraph.create () in
       let _ = WDGraph.add_conjunctions g conjunctions in 
       let _ = WDGraph.simplify g in
-      let _ = WDGraph.add_mem_spat g arr_spat str_spat in  (* IMPORTANT first add array over pointers, otherwise will be hard to check for cycles of yellow edges to detect backward edges (src memory addres > dst memory adress ) *)
+      let _ = WDGraph.add_mem_spat g arr_spat str_spat ptr_spat in (* IMPORTANT first add array over pointers, otherwise will be hard to check for cycles of yellow edges to detect backward edges (src memory addres > dst memory adress ) *)
       let _ = WDGraph.add_ptr g ptr_spat in
+      if _serialize then (
+        Fmt.printf "@[[Partial subformula]@.";
+        Fmt.printf "@[%a@." SHpure.pp p; 
+        let dot_g = DotSerializer.serialize_graph g in
+        Printf.printf "\nDot serialize graph:\n";
+        print_endline dot_g;
+        let dot_qg = DotSerializer.serialize_quotient_graph g in
+        Printf.printf "\nDot serialize quotient graph:\n";
+        print_endline dot_qg;
+      );
+      if _print then (
+        Fmt.printf "@[[Partial subformula]@.";
+        Fmt.printf "@[%a@." SHpure.pp p; 
+        Printf.printf "Graph Summary:\n";
+        TextPrinter.print_graph g;
+        Printf.printf "Quotient Graph Summary:\n";
+        TextPrinter.print_quotient_graph g;
+      );
+
       WDGraph.get_conjunctions_eval_atom g;
   | _ -> failwith "ERROR: Unexpected formula structure during process_conjunctions. Expected: And"
 
@@ -215,7 +235,7 @@ let rec shpure_atom_size (p: SHpure.t) : int =
 let disj_atom_size (p: (SHpure.t * SHspat.t) list) : int = 
   List.fold_left(fun acc (shp, _) -> (shpure_atom_size shp) + acc) 0 p
 
-let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : DisjSH.t =
+let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_serialize : bool) (_print : bool) : DisjSH.t =
   let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
   let ptr_spat = SHspat.getPtrSeg ss in
@@ -223,30 +243,41 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : DisjSH.t =
   let str_spat = SHspat.getStringSeg ss in 
   let end_time_dnf = Unix.gettimeofday () in
   let elapsed_time_dnf = end_time_dnf -. start_time_dnf in
-
-  if _stats then Printf.printf "\nSize of Original formulae (atoms): %d\n" (shpure_atom_size p);
-  if _stats then Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
-  if _stats then Printf.printf "Size of DNF formulae (atoms): %d\n" (shpure_atom_size dnf_p);
+  let _og_size = if _stats then shpure_atom_size p else -1 in
+  let _dnf_size = if _stats then shpure_atom_size dnf_p else -1 in
+  
 
   match dnf_p with
   | Or clauses -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = process_disjunction(List.map (fun clause -> process_conjunctions clause ptr_spat arr_spat str_spat) clauses) in
+    let red_dnf_p = process_disjunction(List.map (fun clause -> process_conjunctions clause ptr_spat arr_spat str_spat _serialize _print) clauses) in
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     
-    if _stats then Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-    if _stats then  Printf.printf "Size of reduced formulae (atoms): %d\n\n" (disj_atom_size red_dnf_p);
+    if _stats then (
+      Printf.printf "\nGENERAL STATS\n";
+      Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
+      Printf.printf "Size of Original formulae (atoms): %d\n" _og_size;
+      Printf.printf "Size of DNF formulae (atoms): %d\n" _dnf_size;
+      Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
+      Printf.printf "Size of reduced formulae (atoms): %d\n\n" (disj_atom_size red_dnf_p);
+    );
 
     red_dnf_p
   | And _ -> 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_dnf_p = [process_conjunctions dnf_p ptr_spat arr_spat str_spat] in 
+    let red_dnf_p = [process_conjunctions dnf_p ptr_spat arr_spat str_spat _serialize _print] in 
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     
-    if _stats then Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
-    if _stats then Printf.printf "Size of reduced formulae (atoms): %d\n\n" (disj_atom_size red_dnf_p);
+    if _stats then (
+      Printf.printf "\nGENERAL STATS\n";
+      Printf.printf "Execution time DNF conversion: %f seconds\n" elapsed_time_dnf;
+      Printf.printf "Size of Original formulae (atoms): %d\n" _og_size;
+      Printf.printf "Size of DNF formulae (atoms): %d\n" _dnf_size;
+      Printf.printf "Execution time reduction: %f seconds\n" elapsed_time_simplify;
+      Printf.printf "Size of reduced formulae (atoms): %d\n\n" (disj_atom_size red_dnf_p);
+    );
 
     red_dnf_p
   | _ -> [(eval_atom dnf_p, [])]
@@ -257,4 +288,77 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats) : DisjSH.t =
 
     (* Traverse SHpure and *)
   
+
+  let partial_preprocess (p: SHpure.t) : SHpure.t =
+    p
+    (*|> SHpure.unfold_indirect      (* Replace indirect references *)*)
+    |> remove_implications         (* Remove implications and biconditionals *)
+    |> push_negations              (* Push negations inward using dual *)
+    |> normalize_associativity    (* Normalize associativity of And/Or *)
+  
+  let rec traverse_partial_reduction (p : SHpure.t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) (_serialize : bool) (_print : bool) : SHpure.t = 
+    match p with
+    | Atom (_,_) -> eval_atom p
+    | Or xs -> 
+      let rec_traversal = (List.map(fun x -> (traverse_partial_reduction x ptr_spat arr_spat str_spat _serialize _print))xs) in
+      Or(rec_traversal)
+      (*if List.exists(fun x -> x = SHpure.True) rec_traversal then True else Or(List.filter(fun e -> e != SHpure.False)rec_traversal)*)
+    | And xs ->
+      let atoms, expr = List.partition(fun x -> match x with | SHpure.Atom (_, _) -> true |_ -> false) xs in
+      let simplify_atoms = if atoms != [] then (
+        let g = WDGraph.create () in
+        let _ = WDGraph.add_conjunctions g atoms in 
+        let _ = WDGraph.simplify g in
+        let _ = WDGraph.add_mem_spat g arr_spat str_spat ptr_spat in (* IMPORTANT first add array over pointers, otherwise will be hard to check for cycles of yellow edges to detect backward edges (src memory addres > dst memory adress ) *)
+        let _ = WDGraph.add_ptr g ptr_spat in
+        if _serialize then (
+          (*Fmt.printf "@[[Partial subformula]@.";
+          Fmt.printf "@[%a@." SHpure.pp SHpure.And(atoms);*)
+          let dot_g = DotSerializer.serialize_graph g in
+          Printf.printf "\nDot serialize graph:\n";
+          print_endline dot_g;
+          let dot_qg = DotSerializer.serialize_quotient_graph g in
+          Printf.printf "\nDot serialize quotient graph:\n";
+          print_endline dot_qg;
+        );
+        if _print then (
+          (*Fmt.printf "@[[Partial subformula]@.";
+          Fmt.printf "@[%a@." SHpure.pp SHpure.And(atoms);*)
+          Printf.printf "Graph Summary:\n";
+          TextPrinter.print_graph g;
+          Printf.printf "Quotient Graph Summary:\n";
+          TextPrinter.print_quotient_graph g;
+        );
+
+        WDGraph.get_partial_conjunctions_eval_atom g
+      ) else [] in
+      let simplify_expr = if expr != [] || simplify_atoms != [False] then List.map(fun x -> traverse_partial_reduction x ptr_spat arr_spat str_spat _serialize _print) expr else [] in (* Lazy eval *)
+      if simplify_atoms = [False] then False 
+      else if expr = [] && simplify_atoms = [] then True else And(simplify_atoms @ simplify_expr)
+    | _ -> failwith "ERROR: Unexpected formula structure during process_partial_conjunctions."
+
+  let partial_simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_serialize : bool) (_print : bool) : SHpure.t =
+    let start_time_dnf = Unix.gettimeofday () in
+    let preprocess_p = partial_preprocess p in
+    let ptr_spat = SHspat.getPtrSeg ss in
+    let arr_spat = SHspat.getArraySeg ss in 
+    let str_spat = SHspat.getStringSeg ss in 
+    let end_time_dnf = Unix.gettimeofday () in
+    let elapsed_time_dnf = end_time_dnf -. start_time_dnf in
+    let _og_size = if _stats then shpure_atom_size p else -1 in
+    let _dnf_size = if _stats then shpure_atom_size preprocess_p else -1 in
+
+    let start_time_simplify = Unix.gettimeofday () in
+    let red_preprocess_p = match preprocess_p with |Atom(_,_) -> eval_atom preprocess_p |_ -> traverse_partial_reduction preprocess_p ptr_spat arr_spat str_spat _serialize _print in 
+    let end_time_simplify = Unix.gettimeofday () in
+    let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
+    if _stats then (
+      Printf.printf "\nGENERAL STATS\n";
+      Printf.printf "Execution time preprocess conversion: %f seconds\n" elapsed_time_dnf;
+      Printf.printf "Size of Original formulae (atoms): %d\n" _og_size;
+      Printf.printf "Size of preprocess formulae (atoms): %d\n" _dnf_size;
+      Printf.printf "Execution time partial reduction: %f seconds\n" elapsed_time_simplify;
+      Printf.printf "Size of reduced formulae (atoms): %d\n\n" (shpure_atom_size red_preprocess_p);
+    );
+    red_preprocess_p
 ;;
