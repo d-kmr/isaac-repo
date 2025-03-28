@@ -38,7 +38,7 @@ let _ucflag = ref false;;
 let _bnflag = ref false;;
 let _timeout = ref None;;
 let _stats = ref false;;
-let partial = ref false;;
+let _normalize = ref false;;
 let _serialize = ref false;;
 let _pretty_print = ref false;;
 let f_help () = print_endline "help";;
@@ -49,7 +49,7 @@ let set_unsatcore () = _ucflag := true;;
 let set_foption opt = p_opt := opt :: !p_opt;;
 let set_timeout sec = _timeout := Some sec;;
 let set_stats () = _stats := true;;
-let set_partial () = _partial := true;;
+let set_normalize () = _normalize := true;;
 let set_serialize () = _serialize := true;;
 let set_pretty_print () = _pretty_print := true;;
   
@@ -64,7 +64,7 @@ let speclist = [
       UC: produce & show unsatcore when an input is unsat
       MD: produce & show a model when an input is sat");
     ("-0", Arg.Unit set_raw, "Use raw z3 (Only checking the pure-part with Z3 ignoring the spat-part)");
-    ("-1", Arg.Unit set_partial, "Use partial application of reduction algorithm to conjunctions (input will not be normalized to DNF)");
+    ("-n", Arg.Unit set_normalize, "Use partial application of reduction algorithm to conjunctions (input will not be normalized to DNF)");
     ("-t", Arg.Int set_timeout, "Set timeout [sec] (default:4294967295)");
     ("-s", Arg.Unit set_stats, "Reports execution stats (execution time for now)");
     ("-g", Arg.Unit set_serialize, "Generates dot code to visualize graphs");
@@ -91,10 +91,18 @@ let () =
   Fmt.printf "@[[Spatial-formula]@.";
   Fmt.printf "@[%a@." SS.pp ss;
 
-  let p' = Simplifier.simplify_pure_spat p ss !_stats !_serialize !_pretty_print in
-
-  Fmt.printf "@[[Simplified formula]@.";
-  Fmt.printf "@[%a@." DisjSH.ppln p';
+  if !_normalize then (
+    let p' =  Simplifier.simplify_pure_spat p ss !_stats !_serialize !_pretty_print in
+    Fmt.printf "@[[Simplified formula]@.";
+    Fmt.printf "@[%a@." DisjSH.ppln p';
+  )
+  else (
+  let p' = Simplifier.partial_simplify_pure_spat p ss !_stats !_serialize !_pretty_print in
+    Fmt.printf "@[[Simplified formula]@.";
+    Fmt.printf "@[%a@." P.pp p'; 
+    Fmt.printf "@[&&@.";
+    Fmt.printf "@[%a@." SS.pp ss;
+  ) 
   
 (*  
   let (startMesRaw,ssMes) = if !_rawflag then ("RAW-MODE ","Ignored") else ("","") in
