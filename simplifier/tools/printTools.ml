@@ -1,4 +1,6 @@
 open Notations
+open Filename
+open Sys
 
 (* Print functions *)
 (* Color printf *)
@@ -171,3 +173,37 @@ let pp_V_newline pp = pp_V "" "\n" pp
 ;;
 let pp_V_semicol pp = pp_V "" ";" pp
 ;;
+let visualize_with_graphviz dot_content =
+  let open Unix in
+  let (in_read, in_write) = pipe () in
+  let (out_read, out_write) = pipe () in
+  
+  match fork () with
+  | 0 -> (* Child process *)
+      close in_write;
+      close out_read;
+      dup2 in_read stdin;
+      dup2 out_write stdout;
+      execvp "dot" [| "dot"; "-Tpng"; "-Kdot" |]
+  | pid -> (* Parent process *)
+      close in_read;
+      close out_write;
+      
+      (* Write DOT content to the process *)
+      let inch = in_channel_of_descr out_read in
+      let ouch = out_channel_of_descr in_write in
+      
+      output_string ouch dot_content;
+      close_out ouch;
+      
+      (* Read the PNG output *)
+      let png_data = really_input_string inch (in_channel_length inch) in
+      close_in inch;
+      
+      (* Save to temporary file and display *)
+      let temp_file = Filename.temp_file "graph" ".png" in
+      let oc = open_out_bin temp_file in
+      output_string oc png_data;
+      close_out oc;
+      
+      ignore (Sys.command (Printf.sprintf "xdg-open %s" temp_file))

@@ -1,5 +1,6 @@
 open Graph
 open Slsyntax
+open Str
 
 module NodeSet = Set.Make(struct
   type t = SHterm.t
@@ -281,7 +282,7 @@ module WDGraph = struct
         let green_edges = List.filter (fun (_, w, _) -> match w with Green _ -> true | _ -> false) edges in
         List.length green_edges > 0
       with Invalid_argument _ -> false in (* If node not found in the quotioent graph *)
-
+    if not (g.unsat) then (
     let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
     let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking spatial pointers" in
     List.iter(fun (a,bs) -> if not (g.unsat) then (
@@ -301,26 +302,28 @@ module WDGraph = struct
                 g.quotient_graph <- g';
               ) bs
       )) ptr_spat
+    )
   
   (* Add memory edges (array+string) in the quotient graph and evaluates any inconsistency *)
   let add_mem_spat (g : t) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) :  unit = 
-    let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
-    let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
-    let mem_spat = arr_spat @ str_spat in
-    (* Add array edges checking for negative addresses *)
-    List.iter(fun (a,b) -> if not (g.unsat) then (
-      let r_a = try r_scc (f_scc a) with | Not_found -> a in
-      let r_b = try r_scc (f_scc b) with | Not_found -> b in
-      match r_a with 
-      | Int i when i <= 0 -> g.unsat <- true
-      | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in a *)
-      | _ -> match r_b with
+    if not (g.unsat) then
+      let r_scc = match g.r_scc with | Some r_scc -> r_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
+      let f_scc = match g.f_scc with | Some f_scc -> f_scc | _ -> failwith "SCCs not computed before checking array and string pointers" in
+      let mem_spat = arr_spat @ str_spat in
+      (* Add array edges checking for negative addresses *)
+      List.iter(fun (a,b) -> if not (g.unsat) then (
+        let r_a = try r_scc (f_scc a) with | Not_found -> a in
+        let r_b = try r_scc (f_scc b) with | Not_found -> b in
+        match r_a with 
         | Int i when i <= 0 -> g.unsat <- true
-        | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in b *)
-        | _ -> (* Add edge *)
-          let g' = G.add_edge_e g.quotient_graph (r_a, Yellow, r_b) in 
-          g.quotient_graph <- g'
-      )) arr_spat;
+        | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in a *)
+        | _ -> match r_b with
+          | Int i when i <= 0 -> g.unsat <- true
+          | Sub [Int x; Int y] when x-y <=0 -> g.unsat <- true (* Check for negative address in b *)
+          | _ -> (* Add edge *)
+            let g' = G.add_edge_e g.quotient_graph (r_a, Yellow, r_b) in 
+            g.quotient_graph <- g'
+        )) arr_spat;
     if not (g.unsat) then
       (* Add string edges checking for negative addresses *)
       List.iter(fun (a,b) -> if not (g.unsat) then (
@@ -350,10 +353,12 @@ module WDGraph = struct
     (* Main algorithm to check overlaps in memory. Checks for common nodes contained in each segment of memory *)
     if not (g.unsat) then (
       let nodes_in_all_paths a b =
+        let r_a = try r_scc (f_scc a) with | Not_found -> a in
+        let r_b = try r_scc (f_scc b) with | Not_found -> b in
         (* Compute nodes reachable from A, forward reachability *)
-        let forward_reachable_nodes = G.fold_succ (fun x acc -> NodeSet.add x acc) g.quotient_graph a (NodeSet.add a NodeSet.empty) in
+        let forward_reachable_nodes = G.fold_succ (fun x acc -> NodeSet.add x acc) g.quotient_graph r_a (NodeSet.add r_a NodeSet.empty) in
         (* Compute nodes that can reach B, backward reachability *)
-        let backward_reachable_nodes = G.fold_pred (fun x acc -> NodeSet.add x acc) g.quotient_graph b (NodeSet.add b NodeSet.empty) in
+        let backward_reachable_nodes = G.fold_pred (fun x acc -> NodeSet.add x acc) g.quotient_graph r_b (NodeSet.add r_b NodeSet.empty) in
         
         (* Intersection of forward and backward reachable nodes, this implementation is efficient with sparse graphs*) 
         (* for more dense graphs a reachability precomputation and store the information beforehand might outperform the current implementation *)
@@ -366,4 +371,76 @@ module WDGraph = struct
         if not (g.unsat) && NodeSet.inter !used_memory pi != NodeSet.empty then g.unsat <- true else used_memory := NodeSet.union !used_memory pi
       )segment_intervals
     )
+end
+
+module DotSerializer = struct
+  
+  (* Helper function to escape special characters in node labels *)
+  let escape_label s =
+    let s = String.escaped s in
+    (* Additional escaping for Graphviz *)
+    Str.global_replace (Str.regexp "\"") "\\\"" s
+  
+  let _serialize graph =
+    let buf = Buffer.create 1024 in
+    Buffer.add_string buf "digraph G {\n";
+    Buffer.add_string buf "  node [shape=box, style=rounded];\n";
+    
+    (* Add all vertices *)
+    WDGraph.G.iter_vertex (fun v ->
+      let label = escape_label (SHterm.to_string v) in
+      Buffer.add_string buf (Printf.sprintf "  \"%s\" [label=\"%s\"];\n" label label)
+    ) graph;
+    
+    (* Add all edges *)
+    WDGraph.G.iter_edges_e (fun (v1, lbl, v2) ->
+      let src = escape_label (SHterm.to_string v1) in
+      let dst = escape_label (SHterm.to_string v2) in
+      let edge_attrs = match lbl with
+        | Red -> " [color=red, penwidth=2.0]"
+        | Blue -> " [color=blue, penwidth=2.0]"
+        | Yellow -> " [color=yellow, penwidth=2.0]"
+        | Orange -> " [color=orange, penwidth=2.0]"
+        | Green s -> Printf.sprintf " [color=green, label=\"%s\", penwidth=2.0]" s
+      in
+      Buffer.add_string buf (Printf.sprintf "  \"%s\" -> \"%s\"%s;\n" src dst edge_attrs)
+    ) graph;
+    
+    Buffer.add_string buf "}\n";
+    Buffer.contents buf
+  
+  let serialize_graph (wdg : WDGraph.t) : string = _serialize wdg.graph
+  let serialize_quotient_graph (wdg : WDGraph.t) : string = _serialize wdg.quotient_graph
+end
+
+module TextPrinter = struct
+  let edge_label_to_string = function
+    | Red -> "Red"
+    | Blue -> "Blue"
+    | Yellow -> "Yellow"
+    | Orange -> "Orange"
+    | Green s -> "Green(" ^ s ^ ")"
+
+  let _pp graph =
+    Printf.printf "Vertices: %d\n" (WDGraph.G.nb_vertex graph);
+    Printf.printf "Edges: %d\n" (WDGraph.G.nb_edges graph);
+    
+    Printf.printf "\nVertices:\n";
+    WDGraph.G.iter_vertex (fun v ->
+      Printf.printf "  • %s\n" (SHterm.to_string v)
+    ) graph;
+    
+    Printf.printf "\nEdges:\n";
+    WDGraph.G.iter_edges_e (fun (v1, lbl, v2) ->
+      Printf.printf "  • %s --[%s]--> %s\n"
+        (SHterm.to_string v1)
+        (edge_label_to_string lbl)
+        (SHterm.to_string v2)
+    ) graph
+  
+  let _pp_black (wdg : WDGraph.t) = 
+    Hashtbl.iter (fun (u, v) _ -> Printf.printf "  • %s <--[Black]--> %s\n" (SHterm.to_string u) (SHterm.to_string v)) wdg.black_edges
+  
+  let print_graph (wdg : WDGraph.t) : unit = if wdg.unsat then Printf.printf "Unsat graph\n" else (_pp wdg.graph; _pp_black wdg)
+  let print_quotient_graph (wdg : WDGraph.t) : unit = if wdg.unsat then Printf.printf "Unsat graph\n" else (_pp wdg.quotient_graph; _pp_black wdg)
 end
