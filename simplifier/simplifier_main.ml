@@ -95,9 +95,13 @@ let () =
   Fmt.printf "@[%a@." SS.pp ss;
 
   let p = if !_prime_imp then Simplifier.compute_prime_implicants p else p in
+  if !_prime_imp then (
+    Fmt.printf "@[[Pure-formula from prime implicants]@.";
+    Fmt.printf "@[%a@." P.pp p;  
+  );
 
   if !_normalize then (
-    let p' =  Simplifier.simplify_pure_spat p ss !_stats !_serialize !_pretty_print in
+    let p' =  Simplifier.simplify_pure_spat p ss !_stats !_serialize !_pretty_print !_prime_imp in
     Fmt.printf "@[[Simplified formula]@.";
     Fmt.printf "@[%a@." DisjSH.ppln p';
   )
