@@ -158,7 +158,7 @@ let isIntValidPure p =
   (* For avoiding Z3 bug *)
   let eMin = T.Int (-100000) in
   let ppLimits vv = List.map (fun v -> eMin <.< (var v Attrs.empty)) vv in
-  let p' = P.And ((ppLimits vv) @ [p]) in
+  let p' = P.Imp (P.And (ppLimits vv), p) in
   let q = allint' vv (mkExp_p p') in
   match checkSatExp false false q with (* ~modelflag:false ~ucflag:false *)
   | SatResult.Model _ -> true

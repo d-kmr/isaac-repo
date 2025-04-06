@@ -27,7 +27,7 @@ WDGNAME=wdg
 WDGML=$(addsuffix .ml,$(WDGNAME))
 WDGCMX=$(addsuffix .cmx,$(WDGNAME))
 
-PKGS=-package z3,ANSITerminal,ocamlgraph -thread
+PKGS=-package z3,ANSITerminal,ocamlgraph,str,progress -thread
 
 INCLUDES=-I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH) -I $(WDGPATH)
 
@@ -74,10 +74,26 @@ $(THISCMX): $(THISML)
 	@echo "Compiling $(THISDIR)/$(basename $@).ml"
 	@cd $(THISPATH); ocamlfind opt $(INCLUDES) $(PKGS) -thread -c $(basename $@).ml
 
+tmcompare: $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) tmcompare.ml tmcompare_main.ml
+	ocamllex $(LEXER).mll
+	ocamlyacc $(PARSER).mly
+	@FILES="$(PARSER).mli $(LEXER).ml $(PARSER).ml";\
+	for FILE in $$FILES; do\
+		echo "Compiling $$FILE";\
+		ocamlfind opt $(INCLUDES) -c $$FILE;\
+	done
+	@echo "Compiling tmcompare.ml"
+	@echo "Compiling tmcompare_main.ml"
+	@ocamlfind opt -o tmcompare $(PKGS) -linkpkg $(INCLUDES)\
+		$(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(THISCMX) $(PARSER).cmx $(LEXER).cmx \
+		tmcompare.ml tmcompare_main.ml
+	@echo "--> tmcompare is produced"
+
 deps:
 	opam install z3
 	opam install ANSITerminal
 	opam install ocamlgraph
+	opam install progress
 
 .PHONY: clean fresh
 clean:
