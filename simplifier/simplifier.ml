@@ -5,6 +5,8 @@ open Notations
 open Slsyntax
 open Wdg
 
+open Tmcompare
+
 (* 
 Currently the pure formullae follows the following grammar (Quantifier free formulae):
 
@@ -235,7 +237,7 @@ let rec shpure_atom_size (p: SHpure.t) : int =
 let disj_atom_size (p: (SHpure.t * SHspat.t) list) : int = 
   List.fold_left(fun acc (shp, _) -> (shpure_atom_size shp) + acc) 0 p
 
-let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_serialize : bool) (_print : bool) : DisjSH.t =
+let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugflag : bool) (_quickflag : bool) (_serialize : bool) (_print : bool) : DisjSH.t =
   let start_time_dnf = Unix.gettimeofday () in
   let dnf_p = to_dnf p in
   let ptr_spat = SHspat.getPtrSeg ss in
@@ -290,18 +292,26 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_serializ
     |> push_negations              (* Push negations inward using dual *)
     |> normalize_associativity    (* Normalize associativity of And/Or *)
   
-  let rec traverse_partial_reduction (p : SHpure.t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) (_serialize : bool) (_print : bool) : SHpure.t = 
+  let rec traverse_partial_reduction (p : SHpure.t) (ss : SHspat.t) (ptr_spat : (SHterm.t * (string * SHterm.t) list) list) (arr_spat : (SHterm.t * SHterm.t) list) (str_spat : (SHterm.t * SHterm.t) list) (_debugflag : bool) (_quickflag : bool) (_serialize : bool) (_print : bool) : SHpure.t = 
     match p with
     | Atom (_,_) -> eval_atom p
     | Or xs -> 
-      let rec_traversal = (List.map(fun x -> (traverse_partial_reduction x ptr_spat arr_spat str_spat _serialize _print))xs) in
+      let rec_traversal = (List.map(fun x -> (traverse_partial_reduction x ss ptr_spat arr_spat str_spat _debugflag _quickflag _serialize _print))xs) in
       Or(rec_traversal)
       (*if List.exists(fun x -> x = SHpure.True) rec_traversal then True else Or(List.filter(fun e -> e != SHpure.False)rec_traversal)*)
     | And xs ->
       let atoms, expr = List.partition(fun x -> match x with | SHpure.Atom (_, _) -> true |_ -> false) xs in
+      List.iter(fun u -> SHpure.println u)atoms;
+      Printf.printf "\n";
+      let (eq,lt,le) = Tmcompare.get_term_relations _debugflag _quickflag (SHpure.And(atoms)) ss in 
+      let eq = List.map (fun (t,u) -> SHpure.Atom(Eq, [t; u])) eq in
+      let lt = List.map (fun (t,u) -> SHpure.Atom(Lt, [t; u])) lt in
+      let le = List.map (fun (t,u) -> SHpure.Atom(Le, [t; u])) le in
+      let hidden_rel = eq @ lt @ le in 
       let simplify_atoms = if atoms != [] then (
         let g = WDGraph.create () in
         let _ = WDGraph.add_conjunctions g atoms in 
+        let _ = WDGraph.add_conjunctions g hidden_rel in 
         let _ = WDGraph.simplify g in
         let _ = WDGraph.add_mem_spat g arr_spat str_spat ptr_spat in (* IMPORTANT first add array over pointers, otherwise will be hard to check for cycles of yellow edges to detect backward edges (src memory addres > dst memory adress ) *)
         let _ = WDGraph.add_ptr g ptr_spat in
@@ -326,12 +336,12 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_serializ
 
         WDGraph.get_partial_conjunctions_eval_atom g
       ) else [] in
-      let simplify_expr = if expr != [] || simplify_atoms != [False] then List.map(fun x -> traverse_partial_reduction x ptr_spat arr_spat str_spat _serialize _print) expr else [] in (* Lazy eval *)
+      let simplify_expr = if expr != [] || simplify_atoms != [False] then List.map(fun x -> traverse_partial_reduction x ss ptr_spat arr_spat str_spat _debugflag _quickflag _serialize _print) expr else [] in (* Lazy eval *)
       if simplify_atoms = [False] then False 
       else if expr = [] && simplify_atoms = [] then True else And(simplify_atoms @ simplify_expr)
     | _ -> failwith "ERROR: Unexpected formula structure during process_partial_conjunctions."
 
-  let partial_simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_serialize : bool) (_print : bool) : SHpure.t =
+  let partial_simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugflag : bool) (_quickflag : bool) (_serialize : bool) (_print : bool) : SHpure.t =
     let start_time_dnf = Unix.gettimeofday () in
     let preprocess_p = partial_preprocess p in
     let ptr_spat = SHspat.getPtrSeg ss in
@@ -343,7 +353,7 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_serializ
     let _dnf_size = if _stats then shpure_atom_size preprocess_p else -1 in
 
     let start_time_simplify = Unix.gettimeofday () in
-    let red_preprocess_p = match preprocess_p with |Atom(_,_) -> eval_atom preprocess_p |_ -> traverse_partial_reduction preprocess_p ptr_spat arr_spat str_spat _serialize _print in 
+    let red_preprocess_p = match preprocess_p with |Atom(_,_) -> eval_atom preprocess_p |_ -> traverse_partial_reduction preprocess_p ss ptr_spat arr_spat str_spat _debugflag _quickflag _serialize _print in 
     let end_time_simplify = Unix.gettimeofday () in
     let elapsed_time_simplify = end_time_simplify -. start_time_simplify in
     if _stats then (
