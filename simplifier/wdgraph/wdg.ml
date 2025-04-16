@@ -87,17 +87,29 @@ module WDGraph = struct
             let edge = G.find_edge g' u v in
             match edge with
             | (_,w',_) ->
-              if w <> w' then
+              match (w, w') with
+              | (Red b1, Red b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g' (u, w', v) in
+                let g' = G.add_edge_e g' (u, Red false, v) in
+                g.graph <- g';
+
+              | (Blue b1, Blue b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g' (u, w', v) in
+                let g' = G.add_edge_e g' (u, Blue false, v) in
+                g.graph <- g';
+
+              | (Red _, Blue _) | (Blue _, Red _) ->
                 (* Update the weight to 0 if the weights differ *)
                 let g' = G.remove_edge_e g' (u, w', v) in
                 let g' = G.add_edge_e g' (u, Red false, v) in
                 g.graph <- g';
                 g.red_edges <- (u, v) :: g.red_edges;
+                
           with Not_found ->
             (* If no edge exists, simply add it *)
             let g' = G.add_edge_e g' (u, w, v) in
             g.graph <- g';
-            if w = Red false then g.red_edges <- (u, v) :: g.red_edges
+            if w = Red false || w = Red true then g.red_edges <- (u, v) :: g.red_edges
 
   (* Add an edge to the quotient graph *)
   let add_quotient_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : edge_label) : unit =
@@ -106,11 +118,22 @@ module WDGraph = struct
         let edge = G.find_edge g.quotient_graph u v in
         match edge with
         | (_,w',_) ->
-          if w <> w' then
-            (* Update the weight to 0 if the weights differ *)
-            let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
-            let g' = G.add_edge_e g' (u, Red false, v) in
-            g.quotient_graph <- g'
+          match (w, w') with
+              | (Red b1, Red b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
+                let g' = G.add_edge_e g' (u, Red false, v) in
+                g.quotient_graph <- g';
+
+              | (Blue b1, Blue b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
+                let g' = G.add_edge_e g' (u, Blue false, v) in
+                g.quotient_graph <- g';
+
+              | (Red _, Blue _) | (Blue _, Red _) ->
+                (* Update the weight to 0 if the weights differ *)
+                let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
+                let g' = G.add_edge_e g' (u, Red false, v) in
+                g.quotient_graph <- g';
         | _ -> let g' = G.add_edge_e g.quotient_graph (u, w, v) in
           g.quotient_graph <- g'
       with Not_found -> 
@@ -148,7 +171,7 @@ module WDGraph = struct
     (* eval them and reduce integers *)
   
   (* Given a list of Atoms (conjunction of them) extract the terms and type of edge and add it to the graph *)
-  let add_conjunctions (g : t) (atoms : SHpure.t list): unit = 
+  let add_conjunctions (g : t) (atoms : SHpure.t list) (hidden : bool): unit = 
       List.iter (fun a ->
         if not (g.unsat) then
           match a with
@@ -162,14 +185,14 @@ module WDGraph = struct
               let t1 = List.nth tt 1 in
                 match op with
                 | Eq -> 
-                    add_edge g t0 t1 (Blue false);
-                    add_edge g t1 t0 (Blue false);
+                    add_edge g t0 t1 (Blue hidden);
+                    add_edge g t1 t0 (Blue hidden);
                 | Neq -> if t0 = t1 then g.unsat <- true else (  (* Black contradiction: `x != x` *)
                   g.graph <- G.add_vertex (G.add_vertex g.graph t0) t1;
                   Hashtbl.replace g.black_edges (normalize_term_pair t0 t1) ();
                   )
-                | Le -> add_edge g t0 t1 (Blue false);
-                | Lt -> add_edge g t0 t1 (Red false);
+                | Le -> add_edge g t0 t1 (Blue hidden);
+                | Lt -> add_edge g t0 t1 (Red hidden);
         ) atoms
 
   (* Simplify the graph, i.e. post-analyssis of diferent properties *)
