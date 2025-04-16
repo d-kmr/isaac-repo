@@ -301,8 +301,6 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugfla
       (*if List.exists(fun x -> x = SHpure.True) rec_traversal then True else Or(List.filter(fun e -> e != SHpure.False)rec_traversal)*)
     | And xs ->
       let atoms, expr = List.partition(fun x -> match x with | SHpure.Atom (_, _) -> true |_ -> false) xs in
-      List.iter(fun u -> SHpure.println u)atoms;
-      Printf.printf "\n";
       let (eq,lt,le) = Tmcompare.get_term_relations _debugflag _quickflag (SHpure.And(atoms)) ss in 
       let eq = List.map (fun (t,u) -> SHpure.Atom(Eq, [t; u])) eq in
       let lt = List.map (fun (t,u) -> SHpure.Atom(Lt, [t; u])) lt in
