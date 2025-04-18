@@ -6,6 +6,7 @@ open Slsyntax
 open Wdg
 
 open Tmcompare
+module SatResult = Smttoz3.SatcheckResult
 
 (* 
 Currently the pure formullae follows the following grammar (Quantifier free formulae):
@@ -297,15 +298,21 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugfla
     | Atom (_,_) -> eval_atom p
     | Or xs -> 
       let rec_traversal = (List.map(fun x -> (traverse_partial_reduction x ss ptr_spat arr_spat str_spat _debugflag _quickflag _serialize _print))xs) in
-      Or(rec_traversal)
+      if List.exists(fun e -> e == SHpure.True) rec_traversal then True
+      else 
+        let filtered_false_atoms = List.filter(fun e -> e != SHpure.False) rec_traversal in
+        if filtered_false_atoms = [] then False else Or(filtered_false_atoms)
       (*if List.exists(fun x -> x = SHpure.True) rec_traversal then True else Or(List.filter(fun e -> e != SHpure.False)rec_traversal)*)
     | And xs ->
       let atoms, expr = List.partition(fun x -> match x with | SHpure.Atom (_, _) -> true |_ -> false) xs in
-      let (eq,lt,le) = Tmcompare.get_term_relations _debugflag _quickflag (SHpure.And(atoms)) ss in 
-      let eq = List.map (fun (t,u) -> SHpure.Atom(Eq, [t; u])) eq in
-      let lt = List.map (fun (t,u) -> SHpure.Atom(Lt, [t; u])) lt in
-      let le = List.map (fun (t,u) -> SHpure.Atom(Le, [t; u])) le in
-      let hidden_rel = eq @ lt @ le in 
+      let eq, lt, le = ref [], ref [], ref [] in
+      if _quickflag then (
+        let (eq0,lt0,le0) = Tmcompare.get_term_relations _debugflag _quickflag (SHpure.And(atoms)) ss in 
+        eq := List.map (fun (t,u) -> SHpure.Atom(Eq, [t; u])) eq0;
+        lt := List.map (fun (t,u) -> SHpure.Atom(Lt, [t; u])) lt0;
+        le := List.map (fun (t,u) -> SHpure.Atom(Le, [t; u])) le0;
+      );
+      let hidden_rel = !eq @ !lt @ !le in 
       let simplify_atoms = if atoms != [] then (
         let g = WDGraph.create () in
         let _ = WDGraph.add_conjunctions g atoms in 
@@ -334,9 +341,15 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugfla
 
         WDGraph.get_partial_conjunctions_eval_atom g
       ) else [] in
-      let simplify_expr = if expr != [] || simplify_atoms != [False] then List.map(fun x -> traverse_partial_reduction x ss ptr_spat arr_spat str_spat _debugflag _quickflag _serialize _print) expr else [] in (* Lazy eval *)
-      if simplify_atoms = [False] then False 
-      else if expr = [] && simplify_atoms = [] then True else And(simplify_atoms @ simplify_expr)
+      let simplify_expr = if expr != [] && simplify_atoms != [False] then List.map(fun x -> traverse_partial_reduction x ss ptr_spat arr_spat str_spat _debugflag _quickflag _serialize _print) expr else [] in (* Lazy eval *)
+      if simplify_atoms == [False] || simplify_expr == [False] then False 
+      else if (expr == [] || expr == [True]) && simplify_atoms == [True] then True else (
+        let simplified_conjunction = simplify_atoms @ simplify_expr in
+        if List.exists(fun e -> e == SHpure.False) simplified_conjunction then False
+        else 
+          let filtered_true_atoms = List.filter(fun e -> e != SHpure.True) simplified_conjunction in
+          if filtered_true_atoms = [] then True else And(filtered_true_atoms)
+      )
     | _ -> failwith "ERROR: Unexpected formula structure during process_partial_conjunctions."
 
   let partial_simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugflag : bool) (_quickflag : bool) (_serialize : bool) (_print : bool) : SHpure.t =
@@ -362,5 +375,13 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugfla
       Printf.printf "Execution time partial reduction: %f seconds\n" elapsed_time_simplify;
       Printf.printf "Size of reduced formulae (atoms): %d\n\n" (shpure_atom_size red_preprocess_p);
     );
+    if Sltosmt.entailPure [red_preprocess_p] p then (
+      if Sltosmt.entailPure [p] red_preprocess_p then
+        Printf.printf "EQUIVALENT FORMULAS!!"
+      else
+        Printf.printf "FORMULAS NOT EQUIVALENT: Entailment 'Og |= Red' failed"
+    )
+    else
+      Printf.printf "FORMULAS NOT EQUIVALENT: Entailment 'Red |= Og' failed";
     red_preprocess_p
 ;;

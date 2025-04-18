@@ -27,12 +27,17 @@ WDGNAME=wdg
 WDGML=$(addsuffix .ml,$(WDGNAME))
 WDGCMX=$(addsuffix .cmx,$(WDGNAME))
 
+TMCOMPAREPATH=$(THISDIR)
+TMCOMPARENAME=tmcompare
+TMCOMPAREML=$(addsuffix .ml,$(WDGNAME))
+TMCOMPARECMX=$(addsuffix .cmx,$(WDGNAME))
+
 PKGS=-package z3,ANSITerminal,ocamlgraph,str,progress -thread
 
-INCLUDES=-I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH) -I $(WDGPATH)
+INCLUDES=-I $(TOOLSPATH) -I $(SLLANGPATH) -I $(SMTPATH) -I $(WDGPATH) -I $(TMCOMPAREPATH)
 
-vpath %.ml $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(WDGPATH)
-vpath %.cmx $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(WDGPATH)
+vpath %.ml $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(WDGPATH) $(TMCOMPAREPATH)
+vpath %.cmx $(TOOLSPATH) $(SLLANGPATH) $(SMTPATH) $(WDGPATH) $(TMCOMPAREPATH)
 vpath %.mll $(SLLANGPATH)
 vpath %.mly $(SLLANGPATH)
 
@@ -49,7 +54,7 @@ $(TARGET): $(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(WDGCMX) $(MAIN)
 	done
 	@echo "Compiling $(MAIN)"
 	@ocamlfind opt -o $(TARGET) $(PKGS) -linkpkg $(INCLUDES)\
-		$(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(WDGCMX) $(THISCMX) $(PARSER).cmx $(LEXER).cmx \
+		$(TOOLSCMX) $(SLLANGCMX) $(SMTCMX) $(WDGCMX) $(THISCMX) tmcompare.ml $(PARSER).cmx $(LEXER).cmx \
 		simplifier.ml \
 		$(MAIN)
 	@echo "--> $(TARGET) is produced"
