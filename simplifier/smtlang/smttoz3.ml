@@ -642,6 +642,7 @@ let checkCommands mode modelflag ucflag vvInt vvNat commands : SatcheckResult.t 
   | Z3.Solver.UNKNOWN,_,_ ->
      dbgf "Z3" "@[Result: UNKNOWN\n@.";
      Fmt.printf "@[checkCommands: solver returns UNKNOWN@.";
+     Fmt.printf "@[%a@." (pp_list_newline Cmd.pp) commands;
      raise UNKNOWN
 ;;
 
