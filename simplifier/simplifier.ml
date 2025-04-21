@@ -315,8 +315,8 @@ let simplify_pure_spat (p : SHpure.t) (ss : SHspat.t) (_stats : bool) (_debugfla
       let hidden_rel = !eq @ !lt @ !le in 
       let simplify_atoms = if atoms != [] then (
         let g = WDGraph.create () in
-        let _ = WDGraph.add_conjunctions g atoms in 
-        let _ = WDGraph.add_conjunctions g hidden_rel in 
+        let _ = WDGraph.add_conjunctions g atoms false in 
+        let _ = WDGraph.add_conjunctions g hidden_rel true in 
         let _ = WDGraph.simplify g in
         let _ = WDGraph.add_mem_spat g arr_spat str_spat ptr_spat in (* IMPORTANT first add array over pointers, otherwise will be hard to check for cycles of yellow edges to detect backward edges (src memory addres > dst memory adress ) *)
         let _ = WDGraph.add_ptr g ptr_spat in

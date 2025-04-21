@@ -104,6 +104,7 @@ module WDGraph = struct
                 let g' = G.add_edge_e g' (u, Red false, v) in
                 g.graph <- g';
                 g.red_edges <- (u, v) :: g.red_edges;
+              | _ -> () 
                 
           with Not_found ->
             (* If no edge exists, simply add it *)
@@ -313,6 +314,8 @@ module WDGraph = struct
           match w with  (* Rebuild atoms or expresions from edges *)
           | Red hidden when hidden = false -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
           | Blue hidden when hidden = false -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
+          | Red _ -> ()
+          | Blue _ -> ()
           | Yellow -> ()
           | Orange -> ()
           | Green _ -> ()
