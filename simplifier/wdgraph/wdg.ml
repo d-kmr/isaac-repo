@@ -90,18 +90,18 @@ module WDGraph = struct
               match (w, w') with
               | (Red b1, Red b2) when b1 <> b2 ->
                 let g' = G.remove_edge_e g' (u, w', v) in
-                let g' = G.add_edge_e g' (u, Red false, v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
                 g.graph <- g';
 
               | (Blue b1, Blue b2) when b1 <> b2 ->
                 let g' = G.remove_edge_e g' (u, w', v) in
-                let g' = G.add_edge_e g' (u, Blue false, v) in
+                let g' = G.add_edge_e g' (u, Blue true, v) in
                 g.graph <- g';
 
               | (Red _, Blue _) | (Blue _, Red _) ->
                 (* Update the weight to 0 if the weights differ *)
                 let g' = G.remove_edge_e g' (u, w', v) in
-                let g' = G.add_edge_e g' (u, Red false, v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
                 g.graph <- g';
                 g.red_edges <- (u, v) :: g.red_edges;
               | _ -> () 
@@ -122,18 +122,18 @@ module WDGraph = struct
           match (w, w') with
               | (Red b1, Red b2) when b1 <> b2 ->
                 let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
-                let g' = G.add_edge_e g' (u, Red false, v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
                 g.quotient_graph <- g';
 
               | (Blue b1, Blue b2) when b1 <> b2 ->
                 let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
-                let g' = G.add_edge_e g' (u, Blue false, v) in
+                let g' = G.add_edge_e g' (u, Blue true, v) in
                 g.quotient_graph <- g';
 
               | (Red _, Blue _) | (Blue _, Red _) ->
                 (* Update the weight to 0 if the weights differ *)
                 let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
-                let g' = G.add_edge_e g' (u, Red false, v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
                 g.quotient_graph <- g';
         | _ -> let g' = G.add_edge_e g.quotient_graph (u, w, v) in
           g.quotient_graph <- g'
