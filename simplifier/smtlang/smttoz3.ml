@@ -535,7 +535,7 @@ This may raise exception UNKNOWN if
 - Assumption: (modelflag && ucflag) != true
 *)
 let checkCommands mode modelflag ucflag vvInt vvNat commands : SatcheckResult.t =
-  set_timeout (Some 60); (* timeout 60sec *)
+  set_timeout (Some 10000); (* timeout 10sec=10000milisec *)
   let ectx =
     let ectx0 = mk_econtext modelflag ucflag commands in
     match mode with
@@ -641,7 +641,7 @@ let checkCommands mode modelflag ucflag vvInt vvNat commands : SatcheckResult.t 
      UnsatCore []
   | Z3.Solver.UNKNOWN,_,_ ->
      dbgf "Z3" "@[Result: UNKNOWN\n@.";
-     Fmt.printf "@[checkCommands: solver returns UNKNOWN@.";
+     Fmt.printf "@[checkCommands: solver returns UNKNOWN: %s@." (Solver.get_reason_unknown solver);     
      Fmt.printf "@[%a@." (pp_list_newline Cmd.pp) commands;
      raise UNKNOWN
 ;;
