@@ -1,0 +1,13 @@
+#!/bin/bash
+
+for i in {1..50}; do
+	echo "Start:$i"
+	./simplifier -s -q -f input/eg07.sat 1> tmp07.out 2> /dev/null
+	grep "UNKNOWN" tmp07.out
+	if [ $? -eq 0 ]; then
+		echo "End:$1 (UNKNOWN found)"
+		exit
+	else
+		echo "End:$1 (no UNKNOWN)"
+	fi
+done		 
