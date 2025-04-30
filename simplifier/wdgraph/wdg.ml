@@ -8,11 +8,11 @@ module NodeSet = Set.Make(struct
 end)
 
 type edge_label = 
-  | Red
-  | Blue
+  | Red of bool (* Boolean value used to indicate hidden relation i.e. if true then the atom is not shown in the final formula as it was not in original input *)
+  | Blue of bool (* Boolean value used to indicate hidden relation i.e. if true then the atom is not shown in the final formula as it was not in original input *)
   | Yellow
   | Orange
-  | Green of string
+  | Green of string (* String value used to store the fieldterm *)
 
 (* Define the graph module using OCamlgraph's Persistent.Digraph.ConcreteLabeled functor *)
 module WDGraph = struct
@@ -26,17 +26,17 @@ module WDGraph = struct
     type t = edge_label
     let compare x y = 
       match (x, y) with
-      | Red, _ -> -1
-      | _, Red -> 1
-      | Blue, _ -> -1
-      | _, Blue -> 1
+      | Red _, _ -> -1
+      | _, Red _-> 1
+      | Blue _, _ -> -1
+      | _, Blue _ -> 1
       | Yellow, _ -> -1
       | _, Yellow -> 1
       | Orange, _ -> -1
       | _, Orange -> 1
       | Green s1, Green s2 -> String.compare s1 s2
       | _, _ -> 0
-    let default = Red
+    let default = Red false
   end)
 
   (* Define a record type for the graph structure *)
@@ -78,7 +78,7 @@ module WDGraph = struct
         (* Check if there is an existing black edge between u and v *)
         try
           let _ = Hashtbl.find g.black_edges black_pair in
-          let g' = G.add_edge_e g' (u, Red, v) in
+          let g' = G.add_edge_e g' (u, Red false, v) in
           g.graph <- g';
           g.red_edges <- (u, v) :: g.red_edges;
           Hashtbl.remove g.black_edges black_pair
@@ -87,17 +87,30 @@ module WDGraph = struct
             let edge = G.find_edge g' u v in
             match edge with
             | (_,w',_) ->
-              if w <> w' then
+              match (w, w') with
+              | (Red b1, Red b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g' (u, w', v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
+                g.graph <- g';
+
+              | (Blue b1, Blue b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g' (u, w', v) in
+                let g' = G.add_edge_e g' (u, Blue true, v) in
+                g.graph <- g';
+
+              | (Red _, Blue _) | (Blue _, Red _) ->
                 (* Update the weight to 0 if the weights differ *)
                 let g' = G.remove_edge_e g' (u, w', v) in
-                let g' = G.add_edge_e g' (u, Red, v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
                 g.graph <- g';
                 g.red_edges <- (u, v) :: g.red_edges;
+              | _ -> () 
+                
           with Not_found ->
             (* If no edge exists, simply add it *)
             let g' = G.add_edge_e g' (u, w, v) in
             g.graph <- g';
-            if w = Red then g.red_edges <- (u, v) :: g.red_edges
+            if w = Red false || w = Red true then g.red_edges <- (u, v) :: g.red_edges
 
   (* Add an edge to the quotient graph *)
   let add_quotient_edge (g : t) (u : SHterm.t) (v : SHterm.t) (w : edge_label) : unit =
@@ -106,11 +119,22 @@ module WDGraph = struct
         let edge = G.find_edge g.quotient_graph u v in
         match edge with
         | (_,w',_) ->
-          if w <> w' then
-            (* Update the weight to 0 if the weights differ *)
-            let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
-            let g' = G.add_edge_e g' (u, Red, v) in
-            g.quotient_graph <- g'
+          match (w, w') with
+              | (Red b1, Red b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
+                g.quotient_graph <- g';
+
+              | (Blue b1, Blue b2) when b1 <> b2 ->
+                let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
+                let g' = G.add_edge_e g' (u, Blue true, v) in
+                g.quotient_graph <- g';
+
+              | (Red _, Blue _) | (Blue _, Red _) ->
+                (* Update the weight to 0 if the weights differ *)
+                let g' = G.remove_edge_e g.quotient_graph (u, w', v) in
+                let g' = G.add_edge_e g' (u, Red true, v) in
+                g.quotient_graph <- g';
         | _ -> let g' = G.add_edge_e g.quotient_graph (u, w, v) in
           g.quotient_graph <- g'
       with Not_found -> 
@@ -148,7 +172,7 @@ module WDGraph = struct
     (* eval them and reduce integers *)
   
   (* Given a list of Atoms (conjunction of them) extract the terms and type of edge and add it to the graph *)
-  let add_conjunctions (g : t) (atoms : SHpure.t list): unit = 
+  let add_conjunctions (g : t) (atoms : SHpure.t list) (hidden : bool): unit = 
       List.iter (fun a ->
         if not (g.unsat) then
           match a with
@@ -162,14 +186,14 @@ module WDGraph = struct
               let t1 = List.nth tt 1 in
                 match op with
                 | Eq -> 
-                    add_edge g t0 t1 Blue;
-                    add_edge g t1 t0 Blue;
+                    add_edge g t0 t1 (Blue hidden);
+                    add_edge g t1 t0 (Blue hidden);
                 | Neq -> if t0 = t1 then g.unsat <- true else (  (* Black contradiction: `x != x` *)
                   g.graph <- G.add_vertex (G.add_vertex g.graph t0) t1;
                   Hashtbl.replace g.black_edges (normalize_term_pair t0 t1) ();
                   )
-                | Le -> add_edge g t0 t1 Blue;
-                | Lt -> add_edge g t0 t1 Red;
+                | Le -> add_edge g t0 t1 (Blue hidden);
+                | Lt -> add_edge g t0 t1 (Red hidden);
         ) atoms
 
   (* Simplify the graph, i.e. post-analyssis of diferent properties *)
@@ -249,8 +273,8 @@ module WDGraph = struct
       let unique_key_nodes = ref NodeSet.empty in (* To avoid repeating pointer atoms for each field, this happens due to limitation in internal implementation of hash tables iterators (can't iterate over keys but just associations) *)
       G.iter_edges_e (fun (u, w, v) -> 
         match w with  (* Rebuild atoms or expresions from edges *)
-        | Red -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
-        | Blue -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
+        | Red hidden when hidden = false -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
+        | Blue hidden when hidden = false -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
         | Yellow -> yo_atoms := SHspatExp.Arr(u,v) :: !yo_atoms
         | Orange -> yo_atoms := SHspatExp.Str(u,v) :: !yo_atoms
         | Green f -> Hashtbl.add g_edges_info u (f, v); unique_key_nodes := NodeSet.add u !unique_key_nodes 
@@ -288,8 +312,10 @@ module WDGraph = struct
         let rb_atoms = ref [] in (* Red / Blue edges (Pure) *)
         G.iter_edges_e (fun (u, w, v) -> 
           match w with  (* Rebuild atoms or expresions from edges *)
-          | Red -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
-          | Blue -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
+          | Red hidden when hidden = false -> rb_atoms := eval_atom(SHpure.Atom(Lt, [u; v])) :: !rb_atoms
+          | Blue hidden when hidden = false -> rb_atoms := eval_atom(SHpure.Atom(Le, [u; v])) :: !rb_atoms
+          | Red _ -> ()
+          | Blue _ -> ()
           | Yellow -> ()
           | Orange -> ()
           | Green _ -> ()
@@ -405,6 +431,7 @@ module WDGraph = struct
     )
 end
 
+(* Module to serialize a graph in dot format *)
 module DotSerializer = struct
   
   (* Helper function to escape special characters in node labels *)
@@ -429,8 +456,8 @@ module DotSerializer = struct
       let src = escape_label (SHterm.to_string v1) in
       let dst = escape_label (SHterm.to_string v2) in
       let edge_attrs = match lbl with
-        | Red -> " [color=red, penwidth=2.0]"
-        | Blue -> " [color=blue, penwidth=2.0]"
+        | Red _ -> " [color=red, penwidth=2.0]"
+        | Blue _ -> " [color=blue, penwidth=2.0]"
         | Yellow -> " [color=yellow, penwidth=2.0]"
         | Orange -> " [color=orange, penwidth=2.0]"
         | Green s -> Printf.sprintf " [color=green, label=\"%s\", penwidth=2.0]" s
@@ -445,10 +472,11 @@ module DotSerializer = struct
   let serialize_quotient_graph (wdg : WDGraph.t) : string = _serialize wdg.quotient_graph
 end
 
+(* Module to serialize a graph in string format prettyprinter :) *)
 module TextPrinter = struct
   let edge_label_to_string = function
-    | Red -> "Red"
-    | Blue -> "Blue"
+    | Red _ -> "Red"
+    | Blue _ -> "Blue"
     | Yellow -> "Yellow"
     | Orange -> "Orange"
     | Green s -> "Green(" ^ s ^ ")"
