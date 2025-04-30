@@ -431,6 +431,7 @@ module WDGraph = struct
     )
 end
 
+(* Module to serialize a graph in dot format *)
 module DotSerializer = struct
   
   (* Helper function to escape special characters in node labels *)
@@ -471,6 +472,7 @@ module DotSerializer = struct
   let serialize_quotient_graph (wdg : WDGraph.t) : string = _serialize wdg.quotient_graph
 end
 
+(* Module to serialize a graph in string format prettyprinter :) *)
 module TextPrinter = struct
   let edge_label_to_string = function
     | Red _ -> "Red"
